@@ -1,0 +1,67 @@
+
+
+/* 列表内容 */
+
+/* .nav_section{
+  width: 100%;
+}
+.nav_section_items{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 30rpx;
+  border-bottom: 2rpx solid #ddd;
+  position: relative;
+}
+.nav_section_items .section_cont{
+  width: 380rpx;
+  font-size: 26rpx;
+  color: #a9a9a9
+}
+
+.nav_section_items .nav_section view{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.nav_section_items .section_cont .section_cont_title{
+  font-size: 30rpx;
+  line-height: 60rpx;
+  color: #000;
+  margin-bottom: 10rpx;
+}
+
+.nav_section_items .section_cont .section_cont_subtitle{
+  font-size:32rpx;
+  color:#d24a58;
+}
+
+.nav_section_items .section_cont .section_cont_rssi{
+  height:80rpx;
+  font-size:26rpx;
+  color:#d24a58;
+  text-align: left;
+  margin-top:35rpx;
+  padding-left:30rpx;
+} */
+
+.device_list{
+  width: 100%;
+  background-color: #CCFFFF;
+}
+
+.section_items{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 30rpx;
+  border-bottom: 2rpx solid #ddd;
+  position: relative;
+}
+
+
+.section_items .id .id_text{
+  text-align: left;
+}

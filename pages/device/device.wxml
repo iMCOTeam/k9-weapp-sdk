@@ -1,0 +1,18 @@
+<loading hidden="{{loadingHidden}}">
+	搜索中...
+</loading>
+
+<view class='device_list'>
+  <view wx:if="{{discoverDevices}}">
+    <view wx:for="{{discoverDevices}}" wx:key="item.deviceId">
+      <view class='section_items'>
+        <view class='title'>{{item.localName}}</view>
+        <view class='id'>
+        {{item.deviceId}}
+        </view>
+        <view class='rssi'>{{item.RSSI}}</view>
+      </view>
+    </view>
+  </view>
+</view>
+

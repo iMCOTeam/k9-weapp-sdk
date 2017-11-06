@@ -1,0 +1,48 @@
+{
+  "pages":[
+    "pages/me/me",
+    "pages/homepage/homepage",
+    "pages/device/device",
+    "pages/logs/logs"
+  ],
+  "window":{
+    "backgroundTextStyle":"light",
+    "navigationBarBackgroundColor": "#CCCCFF",
+    "navigationBarTitleText": "zhuo",
+    "navigationBarTextStyle":"black",
+    "backgroundColor": "#eeeeee"
+  },
+  "tabBar": {
+    "color": "#333300",
+    "selectedColor": "#FF66FF",
+    "backgroundColor": "#99CCFF",
+    "borderStyle": "black",
+    "position": "bottom",
+    "list": [{
+      "pagePath": "pages/homepage/homepage",
+      "text": "首页",
+      "iconPath": "resources/imgs/tabBarIcon/tab_home_nor.png",
+      "selectedIconPath": "resources/imgs/tabBarIcon/tab_home_sel.png"
+    },{
+      "pagePath": "pages/me/me",
+      "text": "我",
+      "iconPath": "resources/imgs/tabBarIcon/tab_me_nor.png",
+      "selectedIconPath": "resources/imgs/tabBarIcon/tab_me_sel.png"
+    },{
+      "pagePath": "pages/device/device",
+      "text": "设备",
+      "iconPath": "resources/imgs/tabBarIcon/tab_devices_nor.png",
+      "selectedIconPath": "resources/imgs/tabBarIcon/tab_devices_sel.png"
+    },{
+      "pagePath": "pages/logs/logs",
+      "text": "Logs",
+      "iconPath": "resources/imgs/tabBarIcon/tab_social_nor.png",
+      "selectedIconPath": "resources/imgs/tabBarIcon/tab_social_sel.png"
+    }]
+  },
+  "networkTimeout":{
+    "request": 10000,
+    "downloadFile": 10000
+  },
+  "debug": true
+}
