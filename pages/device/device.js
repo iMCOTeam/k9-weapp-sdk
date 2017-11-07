@@ -1,5 +1,7 @@
 var realTekBTManager = require('../../utils/ZHBTManager.js')
 var preDef = require('../../utils/ZHBTServiceDef.js')
+
+
 Page({
   /**
    * 页面的初始数据
@@ -11,11 +13,38 @@ Page({
     
   },
 
-  storeLogs:function(loginfo){
-    var logs = wx.getStorageSync('logs') || []
-    logs.unshift(loginfo)
-    wx.setStorageSync('logs', logs)
+  /*
+  * 点击列表事件
+  */
+  clickCell: function(event){
+    var deviceId = event.target.dataset.deviceid
+    console.log("click deviceId",deviceId)
+    wx.showLoading({
+      title: '正在连接...',
+    })
+
+    // 连接
+    realTekBTManager.createBLEConnection({
+      deviceId: deviceId,
+      success: function(res){
+        console.log("connected success")
+        wx.showToast({
+          title: JSON.stringify("connected success"),
+        })
+
+      },
+      fail: function(res){
+        wx.showToast({
+          title: res.errMsg,
+        })
+      },
+      complete: function(res){
+        wx.hideLoading()
+      }
+    })
   },
+   
+  
 
   // 搜索设备
   scanDevice: function(){
@@ -34,14 +63,16 @@ Page({
         realTekBTManager.getBluetoothDevices({
           success: function(res){
             console.log("getBluetoothDevices success"+ JSON.stringify(res))
-            if (res.devices){
+            if (res.devices && (res.devices.length > 0)){
               console.log("divices count" + res.devices.length)
               wx.hideLoading()
               that.setData({
                 discoverDevices: res.devices
               })
             }else{
-              console.log("device count is null")
+              wx.showToast({
+                title: 'device count is 0',
+              })
             }
 
           },
@@ -71,7 +102,6 @@ Page({
     /*realTekBTManager.getConnectedBluetoothDevices({
       services: that.data.serviceUUIDs,
       success: function (res) {
-        that.storeLogs("getConnectedBluetoothDevices success");
         if (res.devices) {
           if (that.data.discoverDevices.length > 0) {
             var connectedDevices = new Array()
@@ -90,7 +120,6 @@ Page({
         }
       },
       fail: function (res) {
-        that.storeLogs("getConnectedBluetoothDevices success" + res.errMsg);
 
       }
     })*/
@@ -117,10 +146,9 @@ Page({
       success: function (res) {
         console.log("openBluetoothAdapter success")
         that.scanDevice()
-
       },
       fail: function (res) {
-        console.log("open bluetoolth fail 111" ,res.errMsg)
+        console.log("open bluetoolth fail" ,res.errMsg)
         wx.showToast({
           title: res.errMsg,
 

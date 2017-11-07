@@ -49,7 +49,6 @@
 
 .device_list{
   width: 100%;
-  background-color: #CCFFFF;
 }
 
 .section_items{

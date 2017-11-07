@@ -1,15 +1,36 @@
 
 //properties
-var isScanning = false
-var callBack = {}
-
+var discovering = false  //是否处于搜索状态
+var callBack = {} 
+var bluetoolthavailable = false //蓝牙适配器是否可用
+var connectedDeviceId = null
 // functions
-function initialBTManager(){
+function initialBTManager(obj){
+
+  let that  = this
+  openBluetoothAdapter({
+    success: function(res) {
+      that.bluetoolthavailable = true
+    },
+    fail: function(res) {
+      that.bluetoolthavailable = false
+
+    }
+  })
+
   //监听蓝牙适配器状态改变
   onBluetoothAdapterStateChange(function (res){
+    let that = this
+    if (!res.discovering){
+      that.discovering = false
+    }else{
+      that.discovering = true
+    }
     if (!res.available){
       console.log("bluetooth adapter is not valid")
+      that.bluetoolthavailable = false
     }else{
+      that.bluetoolthavailable = true
       console.log("bluetooth adapter is valid")
     }
   })
@@ -25,6 +46,16 @@ function initialBTManager(){
 }
 
 
+/*
+* 清除所有缓存
+*/
+function clearCaches()
+{
+  discovering = false  
+  callBack = {}
+  bluetoolthavailable = false
+  connectedDeviceId = null
+}
 
 /*
 * 初始化蓝牙适配器
@@ -223,9 +254,11 @@ function getConnectedBluetoothDevices(obj){
 */
 
 function createBLEConnection(obj){
+  let that = this
   wx.createBLEConnection({
     deviceId: obj.deviceId,
     success: function(res) {
+      that.connectedDeviceId = obj.deviceId
       if(obj.success){
         obj.success(res);
       }

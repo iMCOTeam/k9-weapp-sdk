@@ -4,15 +4,15 @@
 
 <view class='device_list'>
   <view wx:if="{{discoverDevices}}">
-    <block wx:for="{{discoverDevices}}" wx:key="item.deviceId">
+    <view wx:for="{{discoverDevices}}" wx:key="item.deviceId">
     <view class='section_items'>
       <view class='section_leftContent'>
-        <view class='title'>{{item.localName}}</view>
+        <view class='title' bindtap='clickCell' data-deviceid="{{item.deviceId}}">{{item.localName}}</view>
       </view>
-      <view class='rssi'>{{item.RSSI}}</view>
+      <view class='rssi' bindtap='clickCell' data-deviceid="{{item.deviceId}}">{{item.RSSI}}</view>
     </view>
       
-    </block>
+    </view>
   </view>
 </view>
 

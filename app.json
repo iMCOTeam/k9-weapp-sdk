@@ -3,7 +3,8 @@
     "pages/me/me",
     "pages/homepage/homepage",
     "pages/device/device",
-    "pages/logs/logs"
+    "pages/logs/logs",
+    "pages/deviceFunctions/deviceFunctions"
   ],
   "window":{
     "backgroundTextStyle":"light",
