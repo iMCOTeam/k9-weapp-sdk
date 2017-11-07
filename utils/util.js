@@ -17,3 +17,65 @@ const formatNumber = n => {
 module.exports = {
   formatTime: formatTime
 }
+
+
+let ZHFunctionCellMode = {
+  ZHOnlyTitle: "ZHOnlyTitle",
+  ZHTitleAndSwitch: "ZHTitleAndSwitch"
+
+}
+
+
+let ZHFunctionMode = {
+  ZHLogin: "ZHLogin",
+  ZHBind: "ZHBind",
+  ZHCancelBind: "ZHCancelBind",
+  ZHCancelConnect: "ZHCancelConnect",
+  ZHSynTime: "ZHSynTime",
+  ZHSynAlarm: "ZHSynAlarm",
+  ZHGetAlarms: "ZHGetAlarms",
+  ZHSetStepTarget: "ZHSetStepTarget",
+  ZHSynUserProfile: "ZHSynUserProfile",
+  ZHSetlost: "ZHSetlost",
+  ZHSetSittingReminder: "ZHSetSittingReminder",
+  ZHGetSittingReminder: "ZHGetSittingReminder",
+  ZHSetMobileSystem: "ZHSetMobileSystem",
+  ZHEnterPhotoMode: "ZHEnterPhotoMode",
+  ZHExitPhotoMode: "ZHExitPhotoMode",
+  ZHSetRaiseHandLight: "ZHSetRaiseHandLight",
+  ZHGetRaiseHandLightSet: "ZHGetRaiseHandLightSet",
+  ZHQQReminder: "ZHQQReminder",
+  ZHWeChatReminder: "ZHWeChatReminder",
+  ZHSMSReminder: "ZHSMSReminder",
+  ZHLineReminder: "ZHLineReminder",
+  ZHIncomingReminder: "ZHIncomingReminder",
+  ZHGetHistoryData: "ZHGetHistoryData",
+  ZHGetRealTimeData: "ZHGetRealTimeData",
+  ZHSycLastSportData: "ZHSycLastSportData",
+  ZHSycTodayAllSportData: "ZHSycTodayAllSportData",
+  ZHOnceHR: "ZHOnceHR",
+  ZHContinuousHR: "ZHContinuousHR",
+  ZHGetContinuousHRSetting: "ZHGetContinuousHRSetting",
+  ZHFindBand: "ZHFindBand",
+  ZHSetBandName: "ZHSetBandName",
+  ZHGetBandName: "ZHGetBandName",
+  ZHGetBattery: "ZHGetBattery",
+  ZHGetAppVersion: "ZHGetAppVersion",
+  ZHGetPatchVersion: "ZHGetPatchVersion",
+  ZHGetMacAddress: "ZHGetMacAddress",
+  ZHGetSDKVersion: "ZHGetSDKVersion",
+  ZHCheckOTAVersion: "ZHCheckOTAVersion",
+  ZHUpdateOTA: "ZHUpdateOTA",
+  ZHEnterOTAMode: "ZHEnterOTAMode",
+  ZHTestUpdateOTA: "ZHTestUpdateOTA",
+  ZHTestMultiCmd: "ZHTestMultiCmd",
+  ZHTestUser: "ZHTestUser",
+  ZHTestLog: "ZHTestLog",
+  ZHTestMultiReminder: "ZHTestMultiReminder",
+  ZHTestContinuousReminder: "ZHTestContinuousReminder",
+  ZHSetScreenOrientation: "ZHSetScreenOrientation",
+  ZHGetScreenOrientation: "ZHGetScreenOrientation",
+  ZHBloodPressure: "ZHBloodPressure",
+  ZHDeviceFunctions: "ZHDeviceFunctions",
+  ZHSendUniversalMessage: "ZHSendUniversalMessage"
+}

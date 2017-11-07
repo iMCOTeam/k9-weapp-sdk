@@ -1,17 +1,50 @@
 Page({
 
+  
   /**
    * 页面的初始数据
    */
   data: {
-    
+    deviceId: null,
+    functions:[]
   },
+
+  getBindCommadKeys: function(){
+
+
+  },
+
+  getSetCommandKeys: function(){
+
+  },
+
+  getSportCommandKeys: function(){
+
+  },
+
+  getAssistCommandKeys: function(){
+
+  },
+
+  getOTACommandKeys: function(){
+
+  },
+
+  getTestCommandKeys: function(){
+
+  },
+
+
+
+
 
   /**
    * 生命周期函数--监听页面加载
    */
   onLoad: function (options) {
-    
+    this.setData({
+      deviceId: options.deviceId
+    })
   },
 
   /**
