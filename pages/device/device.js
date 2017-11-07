@@ -1,11 +1,11 @@
 var realTekBTManager = require('../../utils/ZHBTManager.js')
-
+var preDef = require('../../utils/ZHBTServiceDef.js')
 Page({
   /**
    * 页面的初始数据
    */
   data: {
-    serviceUUIDs: ["000001ff-3C17-D293-8E48-14FE2E4DA212"],
+    serviceUUIDs: [preDef.RealTek_ServiceUUIDs.RealTek_BroadServiceUUID],
     loadingHidden: true,
     discoverDevices: []
     
@@ -121,6 +121,10 @@ Page({
       },
       fail: function (res) {
         console.log("open bluetoolth fail 111" ,res.errMsg)
+        wx.showToast({
+          title: res.errMsg,
+
+        })
       }
     })
   },
