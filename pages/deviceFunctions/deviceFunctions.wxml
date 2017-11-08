@@ -1,12 +1,12 @@
 <view class='Cmd_list'>
   <view wx:if="{{bindCommands}}">
     <view class='section_title'>绑定命令</view>
-    <view wx:for="{{bindCommands}}" wx:key="item.functionMode">
-    <view class='section_items' bindtap='clickBindCmd' data-deviceid="{{item.functionMode}}">
-      <view class='section_leftContent'>
-        <view class='title' catchtap='clickBindCmd' data-deviceid="{{item.functionMode}}">{{item.title}}</view>
+    <block wx:for="{{bindCommands}}" wx:key="item.functionMode">
+      <view class='section_items' bindtap='clickBindCmd' data-functionmode="{{item.functionMode}}">
+        <view class='section_item_title'>
+          <view class='title' catchtap='clickBindCmd' data-functionmode="{{item.functionMode}}">{{item.title}}</view>
+        </view>
       </view>
-    </view>
-    </view>
+    </block>
   </view>
 </view>

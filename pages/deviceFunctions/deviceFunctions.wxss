@@ -12,7 +12,10 @@
 }
 
 .section_title{
-  height: 60;
-  font: 24;
+  width: 100%;
+  height: 40px;
+  font: 24px;
+  display: flex;
+  justify-content: center;
   background-color: #993399;
 }
