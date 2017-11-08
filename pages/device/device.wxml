@@ -5,11 +5,11 @@
 <view class='device_list'>
   <view wx:if="{{discoverDevices}}">
     <view wx:for="{{discoverDevices}}" wx:key="item.deviceId">
-    <view class='section_items'>
+    <view class='section_items' bindtap='clickCell' data-deviceid="{{item.deviceId}}">
       <view class='section_leftContent'>
-        <view class='title' bindtap='clickCell' data-deviceid="{{item.deviceId}}">{{item.localName}}</view>
+        <view class='title' catchtap='clickCell' data-deviceid="{{item.deviceId}}">{{item.localName}}</view>
       </view>
-      <view class='rssi' bindtap='clickCell' data-deviceid="{{item.deviceId}}">{{item.RSSI}}</view>
+      <view class='rssi' catchtap='clickCell' data-deviceid="{{item.deviceId}}">{{item.RSSI}}</view>
     </view>
       
     </view>

@@ -28,8 +28,8 @@ Page({
       deviceId: deviceId,
       success: function(res){
         console.log("connected success")
-        wx.showToast({
-          title: JSON.stringify("connected success"),
+        wx.navigateTo({
+          url: '../deviceFunctions/deviceFunctions?deviceId='+deviceId,
         })
 
       },

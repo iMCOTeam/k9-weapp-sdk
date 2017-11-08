@@ -1,0 +1,18 @@
+.Cmd_list{
+  width: 100%;
+}
+
+.section_items{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 30rpx;
+  border-bottom: 2rpx solid #ddd;
+  position: relative;
+}
+
+.section_title{
+  height: 60;
+  font: 24;
+  background-color: #993399;
+}

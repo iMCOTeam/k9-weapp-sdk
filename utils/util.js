@@ -14,9 +14,6 @@ const formatNumber = n => {
   return n[1] ? n : '0' + n
 }
 
-module.exports = {
-  formatTime: formatTime
-}
 
 
 let ZHFunctionCellMode = {
@@ -78,4 +75,12 @@ let ZHFunctionMode = {
   ZHBloodPressure: "ZHBloodPressure",
   ZHDeviceFunctions: "ZHDeviceFunctions",
   ZHSendUniversalMessage: "ZHSendUniversalMessage"
+}
+
+
+module.exports = {
+  formatTime: formatTime,
+  ZHFunctionCellMode: ZHFunctionCellMode,
+  ZHFunctionMode: ZHFunctionMode
+
 }

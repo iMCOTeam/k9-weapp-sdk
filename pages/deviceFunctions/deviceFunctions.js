@@ -1,3 +1,6 @@
+const util = require('../../utils/util.js')
+
+
 Page({
 
   
@@ -6,11 +9,22 @@ Page({
    */
   data: {
     deviceId: null,
-    functions:[]
+    bindCommands: []
   },
 
-  getBindCommadKeys: function(){
+  getBindCommandKeys: function(){
+    var ZHOnlyTitle = util.ZHFunctionCellMode.ZHOnlyTitle
+    var ZHTitleAndSwitch = util.ZHFunctionCellMode.ZHTitleAndSwitch
+    var functionMode = util.ZHFunctionMode
 
+    
+    let that = this
+    var login = that.getFunctionObject('登录', ZHOnlyTitle, functionMode.ZHLogin)
+    var bind = that.getFunctionObject('绑定用户', ZHOnlyTitle, functionMode.ZHBind)
+    var cancelBind = that.getFunctionObject('解除绑定', ZHOnlyTitle, functionMode.ZHCancelBind)
+    var cancelConnect = that.getFunctionObject('断开连接', ZHOnlyTitle, functionMode.ZHCancelConnect)
+
+    return [login,bind,cancelBind,cancelConnect]
 
   },
 
@@ -34,7 +48,19 @@ Page({
 
   },
 
+  getFunctionObject: function (title,cellMode,functionMode){
+     var functionModel = new Object()
+     functionModel.cellMode = cellMode
+     functionModel.functionMode = functionMode
+     functionModel.title = title
+     return functionModel
+  },
 
+  
+  clickBindCmd: function (event){
+    var functionMode = event.target.dataset.functionMode
+    console.log("click functionMode", functionMode)
+  },
 
 
 
@@ -42,8 +68,12 @@ Page({
    * 生命周期函数--监听页面加载
    */
   onLoad: function (options) {
+    console.log("options", options.deviceId)
+    var bindCmds = this.getBindCommandKeys()
+
     this.setData({
-      deviceId: options.deviceId
+      deviceId: options.deviceId,
+      bindCommands: bindCmds
     })
   },
 
