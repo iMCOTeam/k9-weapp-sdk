@@ -50,7 +50,23 @@ Page({
    */
   onLoad: function (options) {
     console.log('homepage has loaded')
-  
+
+    var num = 255
+    var hexString = num.toString(16)
+    console.log("hexString",hexString)
+
+    var numInt = parseInt(hexString, 16)
+    console.log("numInt",numInt)
+
+    var numt2 = num.toString(2)
+    console.log("numt2",numt2)
+
+    var testInt2 = 4 & 5
+    console.log("testInt2",testInt2)
+
+    var value16 = 0x16
+    console.log("value6",value16)
+
   },
 
   /**

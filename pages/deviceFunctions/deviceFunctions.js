@@ -60,6 +60,7 @@ Page({
   clickBindCmd: function (event){
     var functionMode = event.target.dataset.functionmode
     console.log("click functionMode", functionMode)
+    
   },
 
 
