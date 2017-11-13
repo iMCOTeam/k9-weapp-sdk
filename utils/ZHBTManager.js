@@ -1,4 +1,7 @@
 
+let cmdPreDef = require("./ZHBTCmdPreDef.js")
+let common = require("./ZHCommon.js")
+
 //properties
 var discovering = false  //是否处于搜索状态
 var callBack = {} 
@@ -469,6 +472,134 @@ function onBLECharacteristicValueChange(obj){
 }
 
 
+/* 
+* 组合协议包
+*/
+
+function appendBuffer(buffer1, buffer2) {
+  var tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
+  tmp.set(new Uint8Array(buffer1), 0);
+  tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
+  return tmp.buffer;
+}
+
+function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errFlagBool, ackFlagBool, sequenceId){
+  var that = this
+  var l2Header = that.getL2HeaderWithCommandId(commandId)
+  var l2Payload = that.getL2Payload(key,keyValueLength,keyValue)
+  var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size;
+  var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
+  var l1PayloadLength = l2HeaderSize + l2PayloadHeaderSize + keyValueLength
+  var l1Payload = new Uint8Array(l1PayloadLength)
+  if(l1Payload.byteLength != l1PayloadLength){
+    common.printDebugInfo("L1 payload init fail", common.ZH_Log_Level.ZH_Log_Error)
+  }else{
+    l1Payload.set(l2Header,0)
+    l1Payload.set(l2Payload, l2HeaderSize)
+    var l1Header = that.getL1HeaderWithAckFlagBool(ackFlagBool,errFlagBool,l1Payload,l1PayloadLength,sequenceId)
+    var l1HeaderLength = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
+    var l1PacketLength = l1HeaderLength + l1PayloadLength
+    var l1Packet = new Uint8Array(l1PacketLength)
+    if(l1Packet.byteLength != l1PacketLength){
+      common.printDebugInfo("L1 packet init fail", common.ZH_Log_Level.ZH_Log_Error)
+
+    }else{
+      l1Packet.set(l1Header,0)
+      l1Packet.set(l1Payload, l1HeaderLength)
+      
+    }
+    return l1Packet
+
+  }
+
+
+}
+
+function getL1HeaderWithAckFlagBool(ackBool, errorBool, L1Payload, L1PayloadLength, sequenceId){
+  var that = this
+  var l1HeaderSize = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
+  var l1Header = new Uint8Array(l1HeaderSize)
+  if(l1Header.byteLength != l1HeaderSize){
+    common.printDebugInfo("L1 Header init fail", common.ZH_Log_Level.ZH_Log_Error)
+  }else{
+    var magic = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Magic
+    var ackVersion = that.getVersionACKErrorValueWithAck(ackBool,errorBool)
+    var l1HeaderOrder = cmdPreDef.L1_Header_ByteOrder
+    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Magic_Pos] = magic
+    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Protocol_Version_Pos] = ackVersion
+    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_HighByte_Pos] = (L1PayloadLength >> 8) & 0xFF
+    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_LowByte_Pos] = L1PayloadLength & 0xFF
+
+    if((L1PayloadLength > 0) && (L1Payload != undefined)){
+      var L1PayloadArray = new Uint8Array(L1Payload)
+      var crc16 = common.getCRC16WithValue(L1PayloadArray)
+      l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_HighByte_Pos] = (crc16 >> 8) & 0xFF
+      l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_LowByte_Pos] = crc16 & 0xFF
+
+    }else{
+      l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_HighByte_Pos] = 0
+      l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_LowByte_Pos] = 0
+    }
+
+    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_SeqID_HighByte_Pos] = (sequenceId >> 8) & 0xFF
+    l1Header[l1Header.DF_RealTek_L1_Header_SeqID_LowByte_Pos] = sequenceId & 0xFF
+
+  }
+
+  return l1Header.buffer
+
+}
+
+function getVersionACKErrorValueWithAck(ackBool, errorBool){
+  var ackEr = 0
+  if (!ackBool && !errorBool) {
+    ackEr = 0;
+  } else if (ackBool && !errorBool) {
+    ackEr = 0x10;
+  } else {
+    ackEr = 0x30;
+  }
+  var version = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Version
+  var result = ackEr | version
+  return result
+}
+
+function getL2HeaderWithCommandId(commandId)
+{
+  var length = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
+  var l2Header = new Uint8Array(length)
+  if(l2Header.byteLength != length){
+    common.printDebugInfo("L2 Header init fail", common.ZH_Log_Level.ZH_Log_Error)
+
+  }else{
+    l2Header[0] = commandId
+    l2Header[1] = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Version
+  }
+  return l2Header.buffer
+}
+
+function getL2Payload(key, keyValueLength, keyValue)
+{
+  var l2Payload_Header_Size = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
+  var loadSize = l2Payload_Header_Size + keyValueLength
+  var l2PayLoad = new Uint8Array(loadSize)
+  if (l2PayLoad.byteLength != length) {
+    common.printDebugInfo("l2 PayLoad init fail", common.ZH_Log_Level.ZH_Log_Error)
+  } else {
+    l2PayLoad[0] = key
+    l2PayLoad[1] = keyValueLength >> 8 & 0x1;
+    l2PayLoad[2] = keyValueLength & 0xFF;
+    if((keyValueLength >0) && (keyValue != undefined)){
+      l2PayLoad.set(l2Payload_Header_Size,keyValue)
+    }
+  }
+
+  return l2PayLoad.buffer
+
+}
+
+//function getL0Packet(commandId, key, keyValue)
+
 // 对外可见模块
 module.exports = {
   initialBTManager: initialBTManager,
@@ -488,6 +619,11 @@ module.exports = {
   writeBLECharacteristicValue: writeBLECharacteristicValue,
   notifyBLECharacteristicValueChange: notifyBLECharacteristicValueChange,
   onBLEConnectionStateChange: onBLEConnectionStateChange,
-  onBLECharacteristicValueChange: onBLECharacteristicValueChange
+  onBLECharacteristicValueChange: onBLECharacteristicValueChange,
+  getL0PacketWithCommandId: getL0PacketWithCommandId,
+  getL1HeaderWithAckFlagBool: getL1HeaderWithAckFlagBool,
+  getVersionACKErrorValueWithAck: getVersionACKErrorValueWithAck,
+  getL2HeaderWithCommandId: getL2HeaderWithCommandId,
+  getL2Payload: getL2Payload
   
 }

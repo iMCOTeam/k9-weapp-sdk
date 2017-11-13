@@ -67,6 +67,11 @@ Page({
     var value16 = 0x16
     console.log("value6",value16)
 
+    var buf = new ArrayBuffer(32)
+
+    var buf1 = new ArrayBuffer(16)
+    
+
   },
 
   /**

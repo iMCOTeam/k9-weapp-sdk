@@ -1,6 +1,7 @@
 var realTekBTManager = require('../../utils/ZHBTManager.js')
 var preDef = require('../../utils/ZHBTServiceDef.js')
-
+var common = require("../../utils/ZHCommon.js")
+var cmdPreDef = require("../../utils/ZHBTCmdPreDef.js")
 
 Page({
   /**
@@ -96,7 +97,11 @@ Page({
    * 生命周期函数--监听页面加载
    */
   onLoad: function (options) {
+    common.printDebugInfo("zhuozhuo test", common.ZH_Log_Level.ZH_Log_Error)
     
+    var buffer = realTekBTManager.getL2HeaderWithCommandId(cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Bind)
+    common.printLogWithBuffer(buffer,"test test")
+
 
     //先获取已经连接手机的特殊设备（UUIDS）
     /*realTekBTManager.getConnectedBluetoothDevices({
