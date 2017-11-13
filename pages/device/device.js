@@ -102,6 +102,18 @@ Page({
     var buffer = realTekBTManager.getL2HeaderWithCommandId(cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Bind)
     common.printLogWithBuffer(buffer,"test test")
 
+    var testIdenti = 12
+    if(testIdenti){
+      console.log("testIdentifier 1111")
+    }
+
+    var testUndi = 33
+    if(testUndi){
+      console.log("testIdentifier 222")
+    }
+
+    
+
 
     //先获取已经连接手机的特殊设备（UUIDS）
     /*realTekBTManager.getConnectedBluetoothDevices({

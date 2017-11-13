@@ -60,6 +60,10 @@ function clearCaches()
   connectedDeviceId = null
 }
 
+
+/* - 蓝牙接口模块 - *／
+
+
 /*
 * 初始化蓝牙适配器
 */
@@ -472,9 +476,7 @@ function onBLECharacteristicValueChange(obj){
 }
 
 
-/* 
-* 组合协议包
-*/
+/* - 组合协议包 - */
 
 function appendBuffer(buffer1, buffer2) {
   var tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
@@ -483,6 +485,9 @@ function appendBuffer(buffer1, buffer2) {
   return tmp.buffer;
 }
 
+/*
+* 获取发送的数据包
+*/
 function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errFlagBool, ackFlagBool, sequenceId){
   var that = this
   var l2Header = that.getL2HeaderWithCommandId(commandId)
@@ -512,9 +517,11 @@ function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errF
 
   }
 
-
 }
 
+/*
+* 获取L1 Header
+*/
 function getL1HeaderWithAckFlagBool(ackBool, errorBool, L1Payload, L1PayloadLength, sequenceId){
   var that = this
   var l1HeaderSize = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
@@ -530,7 +537,7 @@ function getL1HeaderWithAckFlagBool(ackBool, errorBool, L1Payload, L1PayloadLeng
     l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_HighByte_Pos] = (L1PayloadLength >> 8) & 0xFF
     l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_LowByte_Pos] = L1PayloadLength & 0xFF
 
-    if((L1PayloadLength > 0) && (L1Payload != undefined)){
+    if((L1PayloadLength > 0) && L1Payload){
       var L1PayloadArray = new Uint8Array(L1Payload)
       var crc16 = common.getCRC16WithValue(L1PayloadArray)
       l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_HighByte_Pos] = (crc16 >> 8) & 0xFF
@@ -550,6 +557,9 @@ function getL1HeaderWithAckFlagBool(ackBool, errorBool, L1Payload, L1PayloadLeng
 
 }
 
+/*
+* 获取ACK Error Version 组合字节
+*/
 function getVersionACKErrorValueWithAck(ackBool, errorBool){
   var ackEr = 0
   if (!ackBool && !errorBool) {
@@ -564,6 +574,11 @@ function getVersionACKErrorValueWithAck(ackBool, errorBool){
   return result
 }
 
+
+
+/*
+* 获取L2 Header
+*/
 function getL2HeaderWithCommandId(commandId)
 {
   var length = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
@@ -578,6 +593,10 @@ function getL2HeaderWithCommandId(commandId)
   return l2Header.buffer
 }
 
+
+/*
+*获取L2 payload
+*/
 function getL2Payload(key, keyValueLength, keyValue)
 {
   var l2Payload_Header_Size = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
@@ -589,7 +608,7 @@ function getL2Payload(key, keyValueLength, keyValue)
     l2PayLoad[0] = key
     l2PayLoad[1] = keyValueLength >> 8 & 0x1;
     l2PayLoad[2] = keyValueLength & 0xFF;
-    if((keyValueLength >0) && (keyValue != undefined)){
+    if((keyValueLength >0) && keyValue){
       l2PayLoad.set(l2Payload_Header_Size,keyValue)
     }
   }
@@ -598,7 +617,84 @@ function getL2Payload(key, keyValueLength, keyValue)
 
 }
 
+/* - 公共函数 - */
+
+// ArrayBuffer转为字符串，参数为ArrayBuffer对象
+
+function getStringWithBuffer(buf) {
+   return String.fromCharCode.apply(null, new Uint16Array(buf));
+}
+
+// 字符串转为ArrayBuffer对象，参数为字符串
+function getBufferWithString(str) {
+    var buf = new ArrayBuffer(str.length*2); // 每个字符占用2个字节
+    var bufView = new Uint16Array(buf);
+    for (var i=0, strLen=str.length; i<strLen; i++) {
+         bufView[i] = str.charCodeAt(i);
+    }
+    return buf;
+}
+
+function hasConnectDevice(callBack) {
+  if (this.connectedDeviceId) {
+    return true
+  } else {
+    let that = this
+    if (callBack) {
+      var error = that.getDisconnectedError()
+      callBack(that.connectedDeviceId, error, null)
+    }
+  }
+}
+
+function getDisconnectedError() {
+  var error = new Error("The device is disconnected")
+  return error
+}
+
+function getSeqIDWithCommand(cmd,key){
+  var result = (cmd << 8) + key;
+  return result;
+}
+
+/* - 命令函数 - */
+
+
+
+
+/*
+* Bind 
+*/
+
+function bindDeviceWithIdentifier(identifier,callBack){
+  let that = this;
+  var connected = that.hasConnectDevice(callBack)
+  if(!connected){
+    return
+  }
+  var dataBuffer = that.getBufferWithString(identifier)
+  var maxLength = cmdPreDef.DF_RealTek_Header_Predef.DF_RealTek_Max_BoundIdntifier_Length
+  if (dataBuffer.byteLength > maxLength){
+    dataBuffer = dataBuffer.slice(0,maxLength)
+  }
+
+  var bindByte = new Uint8Array(maxLength)
+  bindByte.set(dataBuffer,0)
+
+  var keyValue = bindByte;
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Bind
+  var key = cmdPreDef.ZH_RealTek_Bind_Key.RealTek_Key_Bind_Req
+  var seqId = that.getSeqIDWithCommand(cmd,key)
+  var packet = that.getL0PacketWithCommandId(cmd, key, keyValue, maxLength,false,false,seqId)
+
+
+}
+
 //function getL0Packet(commandId, key, keyValue)
+
+function sendDataToBandDevice(data,ackBool,callBack){
+  
+}
 
 // 对外可见模块
 module.exports = {
