@@ -16,7 +16,7 @@ Page({
     var ZHOnlyTitle = util.ZHFunctionCellMode.ZHOnlyTitle
     var ZHTitleAndSwitch = util.ZHFunctionCellMode.ZHTitleAndSwitch
     var functionMode = util.ZHFunctionMode
-    console.log("functionMode 11111", functionMode.ZHLogin)
+    
 
     let that = this
     var login = that.getFunctionObject('登录', ZHOnlyTitle, functionMode.ZHLogin)
@@ -70,10 +70,7 @@ Page({
    */
   onLoad: function (options) {
     console.log("options", options.deviceId)
-    console.log("2222233333")
     var bindCmds = this.getBindCommandKeys()
-   
-    
     this.setData({
       deviceId: options.deviceId,
       bindCommands: bindCmds

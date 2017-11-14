@@ -1,39 +1,64 @@
-
+let preDefService = require("./ZHBTServiceDef.js")
 let cmdPreDef = require("./ZHBTCmdPreDef.js")
 let common = require("./ZHCommon.js")
 
 //properties
 var discovering = false  //是否处于搜索状态
-var callBack = {} 
+var callBack = {}        //回调函数
 var bluetoolthavailable = false //蓝牙适配器是否可用
-var connectedDeviceId = null
+var connectedDeviceId = null  //已连接设备ID
+
+var allServices = null //该设备所有服务
+var writeCharObj = null //发送命令特征
+var notifyCharObj = null //接收命令或数据的特征
+var immediateCharObj = null //查找手环特征
+var alertLevelCharObj = null //查找手环的特征
+var deviceNameCharObj = null //手环名称相关特征
+var batterylevelCharObj = null //电池电量特征
+var OTAPatchVersioCharObj = null //OTA Patch版本特征
+var OTAAppVersionCharObj = null //OTA App 版本特征
+var functionsCharObj = null // 功能列表特征 暂时无用
+var macAddressCharObj = null //固件蓝牙地址特征
+
+var OTApatchVersion = 0 //OTA Patch version
+var OTAappVersion = 0 //OTA App version
+var macAddress = null //OTA macAddress
+
+
+// 大小端模式判定
+var littleEndian = (function () {
+  var buffer = new ArrayBuffer(2);
+  new DataView(buffer).setInt16(0, 256, true);
+  return new Int16Array(buffer)[0] === 256;
+})();
+
+
+
 // functions
 function initialBTManager(obj){
-
-  let that  = this
+  
   openBluetoothAdapter({
     success: function(res) {
-      that.bluetoolthavailable = true
+      bluetoolthavailable = true
     },
     fail: function(res) {
-      that.bluetoolthavailable = false
+      bluetoolthavailable = false
 
     }
   })
 
   //监听蓝牙适配器状态改变
   onBluetoothAdapterStateChange(function (res){
-    let that = this
     if (!res.discovering){
-      that.discovering = false
+      discovering = false
     }else{
-      that.discovering = true
+      discovering = true
     }
     if (!res.available){
       console.log("bluetooth adapter is not valid")
-      that.bluetoolthavailable = false
+      bluetoolthavailable = false
     }else{
-      that.bluetoolthavailable = true
+      bluetoolthavailable = true
       console.log("bluetooth adapter is valid")
     }
   })
@@ -58,6 +83,22 @@ function clearCaches()
   callBack = {}
   bluetoolthavailable = false
   connectedDeviceId = null
+
+  allServices = null 
+  writeCharObj = null 
+  notifyCharObj = null 
+  immediateCharObj = null
+  alertLevelCharObj = null 
+  deviceNameCharObj = null 
+  batterylevelCharObj = null 
+  OTAPatchVersioCharObj = null 
+  OTAAppVersionCharObj = null 
+  functionsCharObj = null 
+  macAddressCharObj = null 
+
+  OTApatchVersion = 0 
+  OTAappVersion = 0 
+  macAddress = null 
 }
 
 
@@ -261,11 +302,12 @@ function getConnectedBluetoothDevices(obj){
 */
 
 function createBLEConnection(obj){
-  let that = this
   wx.createBLEConnection({
     deviceId: obj.deviceId,
     success: function(res) {
-      that.connectedDeviceId = obj.deviceId
+      connectedDeviceId = obj.deviceId
+      //获取所有特征服务
+      getAllServices()
       if(obj.success){
         obj.success(res);
       }
@@ -316,6 +358,7 @@ function closeBLEConnection(obj){
 */
 
 function getBLEDeviceServices(obj){
+  console.log("call getBLEDeviceServices")
   wx.getBLEDeviceServices({
     deviceId: obj.deviceId,
     success: function(res) {
@@ -324,6 +367,7 @@ function getBLEDeviceServices(obj){
       }
     },
     fail: function (res) {
+      console.log("call getBLEDeviceServices error",res.errMsg)
       if (obj.fail) {
         obj.fail(res)
       }
@@ -476,6 +520,174 @@ function onBLECharacteristicValueChange(obj){
 }
 
 
+/*
+* 获取所有服务
+*/
+function getAllServices(){
+  console.log("call getAllServices")
+  getBLEDeviceServices({
+    deviceId: connectedDeviceId,
+    success: function (serRes) {
+      var services = serRes.services
+      allServices = services
+      console.log("call getAllServices Success", JSON.stringify(services))
+      for(var i=0;i<services.length;i++){
+        var service = services[i]
+        getAllCharacteristics(service.uuid)
+      }
+    },
+    fail: function (serRes) {
+      common.printDebugInfo("getAllServices fail", serRes.errMsg)
+
+    }
+  })
+}
+
+
+/*
+* 获取所有特征
+*/
+
+function getAllCharacteristics(serviceUUID){
+  console.log("call getAllCharacteristics-", serviceUUID)
+  var deviceId = connectedDeviceId
+   getBLEDeviceCharacteristics({
+    deviceId: deviceId,
+    serviceId: serviceUUID,
+    success: function(res){
+      var characteristics = res.characteristics
+      console.log("call getAllCharacteristics Success:", serviceUUID, JSON.stringify(characteristics))
+      for(var i=0;i<characteristics.length;i++){
+        var characteristic = characteristics[i]
+        handleCharacteristic(serviceUUID,characteristic)
+      }
+
+    },
+    fail: function(res){
+      common.printDebugInfo("getAllCharacteristics fail", serRes.errMsg,"ServiceUUID:",serviceUUID)
+    }
+  })
+
+}
+
+
+function handleCharacteristic(serviceUUID,characteristic){
+  console.log("call handleCharacteristic -", characteristic.uuid)
+  
+  var charUUIDString = characteristic.uuid
+  var charProperties = characteristic.properties
+  var preDefChar = preDefService.CharacteristicUUIDs
+  var deviceId = connectedDeviceId
+  if (charUUIDString == preDefChar.RealTek_Write_CharUUID){
+    writeCharObj = characteristic
+  } 
+  if (charUUIDString == preDefChar.RealTek_Notify_CharUUID){
+    notifyCharObj = characteristic
+    handleNotifyCharacteristic(serviceUUID, characteristic)
+  } 
+  if (charUUIDString == preDefChar.RealTek_Immediate_Remind_CharUUID){
+    immediateCharObj = characteristic
+
+  } 
+  if (charUUIDString == preDefChar.RealTek_AlertLevel_CharUUID){
+    alertLevelCharObj = characteristic
+  } 
+  if (charUUIDString == preDefChar.RealTek_DeviceName_CharUUID){
+    deviceNameCharObj = characteristic
+  } 
+  if (charUUIDString == preDefChar.RealTek_BatteryLevel_CharUUID){
+    batterylevelCharObj = characteristic
+    handleNotifyCharacteristic(serviceUUID, characteristic)
+  } 
+
+  if (charUUIDString == preDefChar.RealTek_OTAPatchVersion_CharUUID){
+    OTAPatchVersioCharObj = characteristic
+    console.log("find RealTek_OTAPatchVersion_CharUUID -", characteristic.uuid)
+    if (characteristic.properties.read) {
+      readBLECharacteristicValue({
+        deviceId: deviceId,
+        serviceId: serviceUUID,
+        characteristicId: characteristic.uuid,
+        success: function (res) {
+          
+          var resultValue = res.characteristic.value
+          var dev = new DataView(resultValue)
+          var version = dev.getUint16(0)
+          OTApatchVersion = version
+          common.printDebugInfo("Read OTAPatchVersion Success:", version)
+          console.log("read RealTek_OTAPatchVersion_CharUUID Success-",version)
+
+        },
+        fail: function (res) {
+          common.printDebugInfo("Read OTAAppVersion fail", res.errMsg, "characteristicUUID:", characteristic.uuid)
+
+        },
+        complete: function (res) {
+
+        },
+      })
+
+    }
+  }
+  if (charUUIDString == preDefChar.RealTek_OTAAppVersion_CharUUID){
+    OTAAppVersionCharObj = characteristic
+    if (characteristic.properties.read){
+      readBLECharacteristicValue({
+        deviceId: deviceId,
+        serviceId: serviceUUID,
+        characteristicId: characteristic.uuid,
+        success: function (res) {
+          var resultValue = res.characteristic.value
+          var dev = new DataView(resultValue)
+          var version = dev.getUint32(0)
+          OTAappVersion = version
+          common.printDebugInfo("Read OTAAppVersion Success:", version)
+
+        },
+        fail: function (res) {
+          common.printDebugInfo("Read OTAAppVersion fail", res.errMsg, "characteristicUUID:", characteristic.uuid)
+
+         },
+        complete: function (res) { 
+
+        },
+      })
+
+    }
+    
+  }
+
+  if (charUUIDString == preDefChar.RealTek_Functions_CharUUID){
+    functionsCharObj = characteristic
+  }
+   
+}
+
+
+/* - Notify 接收数据特征 - */
+
+function handleNotifyCharacteristic(serviceId, characteristic){
+  if (characteristic.notify){
+    var deviceId = connectedDeviceId
+    notifyBLECharacteristicValueChange({
+      deviceId:deviceId,
+      serviceId: serviceId,
+      characteristicId: characteristic.uuid,
+      state: true,
+      success: function(res){
+        common.printDebugInfo("NotifyCharacteristics success", res.errMsg, "characteristicUUID:", characteristic.uuid)
+      },
+      fail: function(res){
+        common.printDebugInfo("NotifyCharacteristics fail", res.errMsg, "characteristicUUID:", characteristic.uuid)
+
+      }
+
+
+    })
+
+  }
+}
+
 /* - 组合协议包 - */
 
 function appendBuffer(buffer1, buffer2) {
@@ -489,9 +701,8 @@ function appendBuffer(buffer1, buffer2) {
 * 获取发送的数据包
 */
 function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errFlagBool, ackFlagBool, sequenceId){
-  var that = this
-  var l2Header = that.getL2HeaderWithCommandId(commandId)
-  var l2Payload = that.getL2Payload(key,keyValueLength,keyValue)
+  var l2Header = getL2HeaderWithCommandId(commandId)
+  var l2Payload = getL2Payload(key,keyValueLength,keyValue)
   var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size;
   var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
   var l1PayloadLength = l2HeaderSize + l2PayloadHeaderSize + keyValueLength
@@ -501,7 +712,7 @@ function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errF
   }else{
     l1Payload.set(l2Header,0)
     l1Payload.set(l2Payload, l2HeaderSize)
-    var l1Header = that.getL1HeaderWithAckFlagBool(ackFlagBool,errFlagBool,l1Payload,l1PayloadLength,sequenceId)
+    var l1Header = getL1HeaderWithAckFlagBool(ackFlagBool,errFlagBool,l1Payload,l1PayloadLength,sequenceId)
     var l1HeaderLength = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
     var l1PacketLength = l1HeaderLength + l1PayloadLength
     var l1Packet = new Uint8Array(l1PacketLength)
@@ -523,14 +734,13 @@ function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errF
 * 获取L1 Header
 */
 function getL1HeaderWithAckFlagBool(ackBool, errorBool, L1Payload, L1PayloadLength, sequenceId){
-  var that = this
   var l1HeaderSize = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
   var l1Header = new Uint8Array(l1HeaderSize)
   if(l1Header.byteLength != l1HeaderSize){
     common.printDebugInfo("L1 Header init fail", common.ZH_Log_Level.ZH_Log_Error)
   }else{
     var magic = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Magic
-    var ackVersion = that.getVersionACKErrorValueWithAck(ackBool,errorBool)
+    var ackVersion = getVersionACKErrorValueWithAck(ackBool,errorBool)
     var l1HeaderOrder = cmdPreDef.L1_Header_ByteOrder
     l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Magic_Pos] = magic
     l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Protocol_Version_Pos] = ackVersion
@@ -636,13 +846,12 @@ function getBufferWithString(str) {
 }
 
 function hasConnectDevice(callBack) {
-  if (this.connectedDeviceId) {
+  if (connectedDeviceId) {
     return true
   } else {
-    let that = this
     if (callBack) {
-      var error = that.getDisconnectedError()
-      callBack(that.connectedDeviceId, error, null)
+      var error = getDisconnectedError()
+      callBack(connectedDeviceId, error, null)
     }
   }
 }
@@ -667,12 +876,11 @@ function getSeqIDWithCommand(cmd,key){
 */
 
 function bindDeviceWithIdentifier(identifier,callBack){
-  let that = this;
-  var connected = that.hasConnectDevice(callBack)
+  var connected = hasConnectDevice(callBack)
   if(!connected){
     return
   }
-  var dataBuffer = that.getBufferWithString(identifier)
+  var dataBuffer = getBufferWithString(identifier)
   var maxLength = cmdPreDef.DF_RealTek_Header_Predef.DF_RealTek_Max_BoundIdntifier_Length
   if (dataBuffer.byteLength > maxLength){
     dataBuffer = dataBuffer.slice(0,maxLength)
@@ -684,8 +892,8 @@ function bindDeviceWithIdentifier(identifier,callBack){
   var keyValue = bindByte;
   var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Bind
   var key = cmdPreDef.ZH_RealTek_Bind_Key.RealTek_Key_Bind_Req
-  var seqId = that.getSeqIDWithCommand(cmd,key)
-  var packet = that.getL0PacketWithCommandId(cmd, key, keyValue, maxLength,false,false,seqId)
+  var seqId = getSeqIDWithCommand(cmd,key)
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, maxLength,false,false,seqId)
 
 
 }
@@ -693,7 +901,12 @@ function bindDeviceWithIdentifier(identifier,callBack){
 //function getL0Packet(commandId, key, keyValue)
 
 function sendDataToBandDevice(data,ackBool,callBack){
+
+  var deviceUUID = connectedDeviceId
+  var serviceUUID = preDefService.RealTek_ServiceUUIDs.RealTek_BroadServiceUUID
+  var writeCharUUID = preDefService.CharacteristicUUIDs.RealTek_Write_CharUUID
   
+
 }
 
 // 对外可见模块
