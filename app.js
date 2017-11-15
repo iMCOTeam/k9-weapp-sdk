@@ -1,5 +1,5 @@
 
-const realTekBTManager = require('/utils/ZHBTManager.js')
+const realTekBTManager = require('./utils/ZHBTManager.js')
 //app.js
 App({
   onLaunch: function () {
@@ -12,7 +12,7 @@ App({
 
 
     //初始化蓝牙适配器
-    //realTekBTManager.initialBTManager();
+    realTekBTManager.initialBTManager();
 
     
     // 登录

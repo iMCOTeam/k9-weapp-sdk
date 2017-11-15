@@ -70,6 +70,7 @@ function initialBTManager(obj){
     }
   })
 
+  onBLECharacteristicValueChange()
 
 }
 
@@ -358,7 +359,6 @@ function closeBLEConnection(obj){
 */
 
 function getBLEDeviceServices(obj){
-  console.log("call getBLEDeviceServices")
   wx.getBLEDeviceServices({
     deviceId: obj.deviceId,
     success: function(res) {
@@ -367,7 +367,6 @@ function getBLEDeviceServices(obj){
       }
     },
     fail: function (res) {
-      console.log("call getBLEDeviceServices error",res.errMsg)
       if (obj.fail) {
         obj.fail(res)
       }
@@ -511,12 +510,64 @@ function onBLEConnectionStateChange(obj){
 * 监听低功耗蓝牙设备的特征值变化。必须先启用notify接口才能接收到设备推送的notification。
 */
 
-function onBLECharacteristicValueChange(obj){
+function onBLECharacteristicValueChange(){
   wx.onBLECharacteristicValueChange(function(res){
-    if(obj){
-      obj(res)
-    }
+    console.log("onBLECharacteristicValueChange:",JSON.stringify(res))
+    handleCharacteristicValue(res)
   })
+}
+
+
+function handleCharacteristicValue(obj){
+  var deviceId = obj.deviceId
+  var serviceId = obj.serviceId
+  var charUUIDString = obj.characteristicId
+  var value = obj.value
+  if(deviceId == connectedDeviceId){
+    var preDefChar = preDefService.CharacteristicUUIDs
+    var deviceId = connectedDeviceId
+    if (charUUIDString.indexOf(preDefChar.RealTek_Write_CharUUID) != -1) {
+     
+    }
+    if (charUUIDString.indexOf(preDefChar.RealTek_Notify_CharUUID) != -1) {
+      
+    }
+    if (charUUIDString.indexOf(preDefChar.RealTek_Immediate_Remind_CharUUID) != -1) {
+      
+    }
+    if (charUUIDString.indexOf(preDefChar.RealTek_AlertLevel_CharUUID) != -1) {
+      
+    }
+    if (charUUIDString.indexOf(preDefChar.RealTek_DeviceName_CharUUID) != -1) {
+      
+    }
+    if (charUUIDString.indexOf(preDefChar.RealTek_BatteryLevel_CharUUID) != -1) {
+      
+    }
+
+    if (charUUIDString.indexOf(preDefChar.RealTek_OTAPatchVersion_CharUUID) != -1) {
+      var resultValue = value
+      var dev = new DataView(resultValue)
+      var version = dev.getUint16(0, littleEndian)
+      OTApatchVersion = version   
+      var info = "read RealTek_OTAPatchVersion_CharUUID Success-" + version
+
+      console.log("read RealTek_OTAPatchVersion_CharUUID Success-",version)
+
+    }
+    if (charUUIDString.indexOf(preDefChar.RealTek_OTAAppVersion_CharUUID) != -1) {
+      console.log("read RealTek_OTAAppVersion_CharUUID Success")
+      var resultValue = value
+      var dev = new DataView(resultValue)
+      var version = dev.getUint16(0, littleEndian)
+      OTAappVersion = version
+      console.log("read RealTek_OTAAppVersion_CharUUID Success-", version)
+    }
+
+    if (charUUIDString.indexOf(preDefChar.RealTek_Functions_CharUUID) != -1) {
+      functionsCharObj = characteristic
+    }
+  }
 }
 
 
@@ -530,14 +581,14 @@ function getAllServices(){
     success: function (serRes) {
       var services = serRes.services
       allServices = services
-      console.log("call getAllServices Success", JSON.stringify(services))
       for(var i=0;i<services.length;i++){
         var service = services[i]
         getAllCharacteristics(service.uuid)
       }
     },
     fail: function (serRes) {
-      common.printDebugInfo("getAllServices fail", serRes.errMsg)
+      var info = "getAllServices fail" + serRes.errMsg
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
 
     }
   })
@@ -556,7 +607,6 @@ function getAllCharacteristics(serviceUUID){
     serviceId: serviceUUID,
     success: function(res){
       var characteristics = res.characteristics
-      console.log("call getAllCharacteristics Success:", serviceUUID, JSON.stringify(characteristics))
       for(var i=0;i<characteristics.length;i++){
         var characteristic = characteristics[i]
         handleCharacteristic(serviceUUID,characteristic)
@@ -564,7 +614,8 @@ function getAllCharacteristics(serviceUUID){
 
     },
     fail: function(res){
-      common.printDebugInfo("getAllCharacteristics fail", serRes.errMsg,"ServiceUUID:",serviceUUID)
+      var info = "getAllCharacteristics fail" + serRes.errMsg + "ServiceUUID:" + serviceUUID
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
     }
   })
 
@@ -572,35 +623,35 @@ function getAllCharacteristics(serviceUUID){
 
 
 function handleCharacteristic(serviceUUID,characteristic){
-  console.log("call handleCharacteristic -", characteristic.uuid)
-  
+
   var charUUIDString = characteristic.uuid
   var charProperties = characteristic.properties
   var preDefChar = preDefService.CharacteristicUUIDs
   var deviceId = connectedDeviceId
-  if (charUUIDString == preDefChar.RealTek_Write_CharUUID){
+  if (charUUIDString.indexOf(preDefChar.RealTek_Write_CharUUID) != -1){
+    console.log("find RealTek_Write_CharUUID -", characteristic.uuid)
     writeCharObj = characteristic
   } 
-  if (charUUIDString == preDefChar.RealTek_Notify_CharUUID){
+  if (charUUIDString.indexOf(preDefChar.RealTek_Notify_CharUUID) != -1){
     notifyCharObj = characteristic
     handleNotifyCharacteristic(serviceUUID, characteristic)
   } 
-  if (charUUIDString == preDefChar.RealTek_Immediate_Remind_CharUUID){
+  if (charUUIDString.indexOf(preDefChar.RealTek_Immediate_Remind_CharUUID) != -1 ){
     immediateCharObj = characteristic
 
   } 
-  if (charUUIDString == preDefChar.RealTek_AlertLevel_CharUUID){
+  if (charUUIDString.indexOf(preDefChar.RealTek_AlertLevel_CharUUID) != -1 ){
     alertLevelCharObj = characteristic
   } 
-  if (charUUIDString == preDefChar.RealTek_DeviceName_CharUUID){
+  if (charUUIDString.indexOf(preDefChar.RealTek_DeviceName_CharUUID) != -1 ){
     deviceNameCharObj = characteristic
   } 
-  if (charUUIDString == preDefChar.RealTek_BatteryLevel_CharUUID){
+  if (charUUIDString.indexOf(preDefChar.RealTek_BatteryLevel_CharUUID) != -1){
     batterylevelCharObj = characteristic
     handleNotifyCharacteristic(serviceUUID, characteristic)
   } 
 
-  if (charUUIDString == preDefChar.RealTek_OTAPatchVersion_CharUUID){
+  if (charUUIDString.indexOf(preDefChar.RealTek_OTAPatchVersion_CharUUID) != -1){
     OTAPatchVersioCharObj = characteristic
     console.log("find RealTek_OTAPatchVersion_CharUUID -", characteristic.uuid)
     if (characteristic.properties.read) {
@@ -609,17 +660,11 @@ function handleCharacteristic(serviceUUID,characteristic){
         serviceId: serviceUUID,
         characteristicId: characteristic.uuid,
         success: function (res) {
-          
-          var resultValue = res.characteristic.value
-          var dev = new DataView(resultValue)
-          var version = dev.getUint16(0)
-          OTApatchVersion = version
-          common.printDebugInfo("Read OTAPatchVersion Success:", version)
-          console.log("read RealTek_OTAPatchVersion_CharUUID Success-",version)
-
+          console.log("Read OTAPatchVersion Success:", JSON.stringify(res))
         },
         fail: function (res) {
-          common.printDebugInfo("Read OTAAppVersion fail", res.errMsg, "characteristicUUID:", characteristic.uuid)
+          var info = "Read OTAPatchVersion fail" + res.errMsg + "characteristicUUID:" + characteristic.uuid
+          common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
 
         },
         complete: function (res) {
@@ -629,7 +674,7 @@ function handleCharacteristic(serviceUUID,characteristic){
 
     }
   }
-  if (charUUIDString == preDefChar.RealTek_OTAAppVersion_CharUUID){
+  if (charUUIDString.indexOf(preDefChar.RealTek_OTAAppVersion_CharUUID) != -1 ){
     OTAAppVersionCharObj = characteristic
     if (characteristic.properties.read){
       readBLECharacteristicValue({
@@ -637,15 +682,11 @@ function handleCharacteristic(serviceUUID,characteristic){
         serviceId: serviceUUID,
         characteristicId: characteristic.uuid,
         success: function (res) {
-          var resultValue = res.characteristic.value
-          var dev = new DataView(resultValue)
-          var version = dev.getUint32(0)
-          OTAappVersion = version
-          common.printDebugInfo("Read OTAAppVersion Success:", version)
-
+          console.log("Read OTAAppVersion Success:", JSON.stringify(res))
         },
         fail: function (res) {
-          common.printDebugInfo("Read OTAAppVersion fail", res.errMsg, "characteristicUUID:", characteristic.uuid)
+          var info = "Read OTAAppVersion fail" + res.errMsg + "characteristicUUID:" + characteristic.uuid
+          common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
 
          },
         complete: function (res) { 
@@ -657,7 +698,7 @@ function handleCharacteristic(serviceUUID,characteristic){
     
   }
 
-  if (charUUIDString == preDefChar.RealTek_Functions_CharUUID){
+  if (charUUIDString.indexOf(preDefChar.RealTek_Functions_CharUUID) != -1 ){
     functionsCharObj = characteristic
   }
    
@@ -675,10 +716,12 @@ function handleNotifyCharacteristic(serviceId, characteristic){
       characteristicId: characteristic.uuid,
       state: true,
       success: function(res){
-        common.printDebugInfo("NotifyCharacteristics success", res.errMsg, "characteristicUUID:", characteristic.uuid)
+        var info = "NotifyCharacteristics success" + characteristic.uuid
+        common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
       },
       fail: function(res){
-        common.printDebugInfo("NotifyCharacteristics fail", res.errMsg, "characteristicUUID:", characteristic.uuid)
+        var info = "NotifyCharacteristics fail" + res.errMsg + "characteristicUUID:" + characteristic.uuid
+        common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
 
       }
 
@@ -718,7 +761,6 @@ function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errF
     var l1Packet = new Uint8Array(l1PacketLength)
     if(l1Packet.byteLength != l1PacketLength){
       common.printDebugInfo("L1 packet init fail", common.ZH_Log_Level.ZH_Log_Error)
-
     }else{
       l1Packet.set(l1Header,0)
       l1Packet.set(l1Payload, l1HeaderLength)
