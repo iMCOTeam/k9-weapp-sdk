@@ -71,6 +71,12 @@ Page({
 
     var buf1 = new ArrayBuffer(16)
     
+    var testNull = null
+    if(testNull){
+      console.log("testNull")
+    }else{
+      console.log("test 134")
+    }
 
   },
 

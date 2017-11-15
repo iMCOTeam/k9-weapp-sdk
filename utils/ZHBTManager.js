@@ -1,12 +1,14 @@
 let preDefService = require("./ZHBTServiceDef.js")
 let cmdPreDef = require("./ZHBTCmdPreDef.js")
 let common = require("./ZHCommon.js")
+let preModel = require("./ZHBTModel.js")
 
 //properties
 var discovering = false  //是否处于搜索状态
-var callBack = {}        //回调函数
+var characteristicValueWrtieBlocks = []        //回调函数
 var bluetoolthavailable = false //蓝牙适配器是否可用
 var connectedDeviceId = null  //已连接设备ID
+
 
 var allServices = null //该设备所有服务
 var writeCharObj = null //发送命令特征
@@ -81,7 +83,7 @@ function initialBTManager(obj){
 function clearCaches()
 {
   discovering = false  
-  callBack = {}
+  characteristicValueWrtieBlocks = []
   bluetoolthavailable = false
   connectedDeviceId = null
 
@@ -517,12 +519,17 @@ function onBLECharacteristicValueChange(){
   })
 }
 
-
+/*
+* 操作特征值的改变（Read Notify)
+*/
 function handleCharacteristicValue(obj){
   var deviceId = obj.deviceId
   var serviceId = obj.serviceId
   var charUUIDString = obj.characteristicId
   var value = obj.value
+  var label = "Characteristic UUID: " + charUUIDString + " Value Changed: "
+  common.printLogWithBuffer(value,label)
+
   if(deviceId == connectedDeviceId){
     var preDefChar = preDefService.CharacteristicUUIDs
     var deviceId = connectedDeviceId
@@ -530,7 +537,7 @@ function handleCharacteristicValue(obj){
      
     }
     if (charUUIDString.indexOf(preDefChar.RealTek_Notify_CharUUID) != -1) {
-      
+      handleReceivedData(value)
     }
     if (charUUIDString.indexOf(preDefChar.RealTek_Immediate_Remind_CharUUID) != -1) {
       
@@ -570,6 +577,46 @@ function handleCharacteristicValue(obj){
   }
 }
 
+/*
+* 操作接收到的命令数据 RealTek_Notify_CharUUID
+*/
+
+function handleReceivedData(value){
+  var dataLength = value.byteLength
+  var l1HeaderSize = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
+  if(dataLength < l1HeaderSize){
+    var info = "Receive data length is small L1 Header Size"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
+    return
+  }
+  var l1HeaderMagicBuf = DataView(value,0,1) //value.slice(0, 1)
+  var l1AckVersionBuf = DataView(value, 1, 1)//value.slice(1,2)
+  var l1PayloadBuf = DataView(value, 2, 2) //value.slice(2,4)
+  var l1CRCBuf = DataView(value, 4, 2)//value.slice(4,6)
+  var l1SeqIdBuf = DataView(value, 6, 2) //value.slice(6)
+
+  var l1HeaderMagic = l1HeaderMagicBuf.getUint8(0)
+  var l1AckVersion = l1AckVersionBuf.getUint8(0)
+  var l1Payload = l1PayloadBuf.getUint16(0,littleEndian)
+  var l1CRC = l1CRCBuf.getUint16(0,littleEndian)
+  var l1SeqId = l1SeqIdBuf.getUint16(0,littleEndian)
+
+  var errFlag = (l1AckVersion >> 5) & 0x1
+  var ackFlag = (l1AckVersion >> 4) & 0x1
+
+  var info = "SeqId:" + l1SeqId + " CRC16:" + l1CRC + " errFlag:" + errFlag + " ackFlag:" + ackFlag
+  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+
+  if (l1HeaderMagic != cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Magic){
+    sendErrorAck(l1SeqId,null)
+    return
+  }
+
+  
+
+
+
+}
 
 /*
 * 获取所有服务
@@ -621,7 +668,9 @@ function getAllCharacteristics(serviceUUID){
 
 }
 
-
+/*
+* 操作服务特征
+*/
 function handleCharacteristic(serviceUUID,characteristic){
 
   var charUUIDString = characteristic.uuid
@@ -705,7 +754,7 @@ function handleCharacteristic(serviceUUID,characteristic){
 }
 
 
-/* - Notify 接收数据特征 - */
+/* - Notify特征 - */
 
 function handleNotifyCharacteristic(serviceId, characteristic){
   if (characteristic.notify){
@@ -869,6 +918,20 @@ function getL2Payload(key, keyValueLength, keyValue)
 
 }
 
+/*
+* 发送错误ack
+*/
+function sendErrorAck(seq,callBack){
+  var errorPacket = getL1HeaderWithAckFlagBool(true,true,null,0,seq)
+  sendDataToBandDevice({
+    data: errorPacket,
+    ackBool: true,
+    callBack: callBack
+  })
+
+
+}
+
 /* - 公共函数 - */
 
 // ArrayBuffer转为字符串，参数为ArrayBuffer对象
@@ -887,6 +950,9 @@ function getBufferWithString(str) {
     return buf;
 }
 
+/*
+* 无连接发送命令时回调
+*/
 function hasConnectDevice(callBack) {
   if (connectedDeviceId) {
     return true
@@ -898,11 +964,29 @@ function hasConnectDevice(callBack) {
   }
 }
 
+
+/*
+* 获取断开连接错误回调
+*/
 function getDisconnectedError() {
-  var error = new Error("The device is disconnected")
+  var error = new Object()
+  error.errMsg = "The device is disconnected"
+  error.code = preModel.ZH_RealTek_Error_Code.ZHDisConnectedErrorCode
   return error
 }
 
+/*
+* 获取微信自定义错误
+*/
+function getWechatCustomError(res){
+  var error = new Object()
+  error.errMsg = res.errMsg
+  error.errCode = res.errCode
+}
+
+/*
+* 获取自定义SeqID 
+*/
 function getSeqIDWithCommand(cmd,key){
   var result = (cmd << 8) + key;
   return result;
@@ -942,13 +1026,127 @@ function bindDeviceWithIdentifier(identifier,callBack){
 
 //function getL0Packet(commandId, key, keyValue)
 
-function sendDataToBandDevice(data,ackBool,callBack){
+function sendDataToBandDevice(obj){
+  if(writeCharObj){
+    var data = obj.data
+    var ackBool = obj.ackBool
+    var callBack = obj.callBack
 
-  var deviceUUID = connectedDeviceId
-  var serviceUUID = preDefService.RealTek_ServiceUUIDs.RealTek_BroadServiceUUID
-  var writeCharUUID = preDefService.CharacteristicUUIDs.RealTek_Write_CharUUID
+    var deviceUUID = connectedDeviceId
+    var serviceUUID = preDefService.RealTek_ServiceUUIDs.RealTek_BroadServiceUUID
+    var writeCharUUID = writeCharObj.uuid
+    if(!ackBool && callBack){
+      common.printLogWithBuffer(data,"Send Packet")
+      var key = getCommandIDAndKeyWithPacketData(data) //获取command and key 组合数字作为回调函数的key
+      var keyInfo = "Save Block key is: " + key
+      common.printDebugInfo(keyInfo, common.ZH_Log_Level.ZH_Log_Info)
+      characteristicValueWrtieBlocks.key = callBack
+    }else if (ackBool){
+      common.printLogWithBuffer(data, "Send ack")
+    }else {
+      common.printLogWithBuffer(data, "Send Packet")
+    }
+    
+    writeBLECharacteristicValue({
+      deviceId: connectedDeviceId,
+      serviceId: serviceUUID,
+      characteristicId: writeCharUUID,
+      value: data,
+      success: function(res) {
+        if(callBack){
+          if(ackBool){
+            callBack(connectedDeviceId,null,null)
+          }
+        }
+      },
+      fail: function(res) {
+        if(callBack){
+          var error = getWechatCustomError(res)
+          if(ackBool){
+            var info = "Write Ack Packet error: " + res.errMsg
+            common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
+            callBack(connectedDeviceId,error,null)
+
+          }else{
+            var info = "Write Command Packet error: " + res.errMsg
+            common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
+            callBack(connectedDeviceId,error,null)
+          }
+        }
+      },
+      complete: function(res) {},
+    })
+
+  }
+}
+
+
+
+/* 
+* 根据接收到的数据获取发送命令时的SeqID
+*/
+function getCommandIDAndKeyWithPacketData(data){
+  var uint8View = new Uint8Array(data)
+  if (uint8View.length > 10){
+    var cmd = uint8View[8]
+    var key = uint8View[10]
+    var preInfo = "replace before cmd:" + cmd + "---key:" + key
+    common.printDebugInfo(preInfo, common.ZH_Log_Level.ZH_Log_Info)
+
+    key = replaceReskey(key,cmd)
+    var lastInfo = "replace end cmd:" + cmd + "---key:" + key
+    common.printDebugInfo(lastInfo, common.ZH_Log_Level.ZH_Log_Info)
+
+    var result = (cmd << 8) + key
+
+    return result
+
+  }
   
 
+}
+
+/*
+* 根据cmd 和 key 看是否需要替换key
+*/
+function replaceReskey(key,cmd){
+  var CMD_IDs = cmdPreDef.ZH_RealTek_CMD_ID
+  if (cmd == CMD_IDs.RealTek_CMD_Setting){
+    var Setting_Keys = cmdPreDef.ZH_RealTek_Setting_Key
+    switch (key){
+      case Setting_Keys.RealTek_Key_Get_TurnLight_Rep:
+        return Setting_Keys.RealTek_Key_Get_TurnLight_Req
+      case Setting_Keys.RealTek_Key_Get_ALarmList_Rep:
+        return Setting_Keys.RealTek_Key_Get_ALarmList_Rep
+      case Setting_Keys.RealTek_Key_Get_Sit_Long_Rep:
+        return Setting_Keys.RealTek_Key_Get_Sit_Long_Req
+      case Setting_Keys.RealTek_Key_Get_ScreenOrientationRep:
+        return Setting_Keys.RealTek_Key_Get_ScreenOrientationReq
+      case Setting_Keys.RealTek_Key_Get_FunctionsRep:
+        return Setting_Keys.RealTek_Key_Get_FunctionsReq
+
+    }
+  } else if (cmd == CMD_IDs.RealTek_CMD_Bind){
+    var Bind_Keys = cmdPreDef.ZH_RealTek_Bind_Key
+    switch(key){
+      case Bind_Keys.RealTek_Key_Bind_Rep:
+        return Bind_Keys.RealTek_Key_Bind_Req
+      case Bind_Keys.RealTek_Key_Login_Rep:
+        return Bind_Keys.RealTek_Key_Login_Req
+    }
+  } else if (cmd == CMD_IDs.RealTek_CMD_SportData){
+    var SportData_Keys = cmdPreDef.ZH_RealTek_Sport_Key
+    switch(key){
+      case SportData_Keys.RealTek_Key_His_SportData_Syc_End:
+        return SportData_Keys.RealTek_Key_Sport_Req
+      case SportData_Keys.RealTek_Key_HR_GetContinuousSet_Rep:
+        return SportData_Keys.RealTek_Key_HR_GetContinuousSet
+    }
+  } else if (cmd == CMD_IDs.RealTek_CMD_Control){
+
+  }
+
+  return key
 }
 
 // 对外可见模块
