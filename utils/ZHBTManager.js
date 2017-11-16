@@ -8,7 +8,9 @@ var discovering = false  //是否处于搜索状态
 var characteristicValueWrtieBlocks = []        //回调函数
 var bluetoolthavailable = false //蓝牙适配器是否可用
 var connectedDeviceId = null  //已连接设备ID
-
+var receiveData = null //接收的数据
+var receivePayloadLength = 0 //接收数据时的数据长度，用于判断Notify的数据是否接收完整
+var receiveDataSeq = 0 //接收数据时的序列号
 
 var allServices = null //该设备所有服务
 var writeCharObj = null //发送命令特征
@@ -34,7 +36,13 @@ var littleEndian = (function () {
   return new Int16Array(buffer)[0] === 256;
 })();
 
-
+// 组合buffer
+function appendBuffer(buffer1, buffer2) {
+  var tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
+  tmp.set(new Uint8Array(buffer1), 0);
+  tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
+  return tmp.buffer;
+}
 
 // functions
 function initialBTManager(obj){
@@ -86,6 +94,9 @@ function clearCaches()
   characteristicValueWrtieBlocks = []
   bluetoolthavailable = false
   connectedDeviceId = null
+  receiveData = null 
+  receivePayloadLength = 0 
+  receiveDataSeq = 0 
 
   allServices = null 
   writeCharObj = null 
@@ -102,6 +113,15 @@ function clearCaches()
   OTApatchVersion = 0 
   OTAappVersion = 0 
   macAddress = null 
+}
+
+
+/* - 清除接收到数据的缓存 - */
+function clearReceiveDataCaches(){
+  receivePayloadLength = 0
+  receiveData = null
+  receiveDataSeq = 0
+
 }
 
 
@@ -584,6 +604,7 @@ function handleCharacteristicValue(obj){
 function handleReceivedData(value){
   var dataLength = value.byteLength
   var l1HeaderSize = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
+  var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
   if(dataLength < l1HeaderSize){
     var info = "Receive data length is small L1 Header Size"
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
@@ -612,8 +633,144 @@ function handleReceivedData(value){
     return
   }
 
-  
+  //CRC16 Check
+  var l1PayloadLength = dataLength - l1HeaderSize
+  if(l1PayloadLength > 0){
+    var l1PayloadData = value.slice(l1HeaderSize)
+    var checkCRC16Bool =  checkCRC16WithData(l1PayloadData,l1CRC)
+    if(!checkCRC16Bool){
+      sendErrorAck(l1SeqId,null)
+      return
+    }
+  }
 
+  if (errFlag == 0 && ackFlag == 1) { //Suc ACK
+    if (l1PayloadLength == 0) {//命令相应的Ack表示已经收到并且无payload所以只需直接回调
+        var blockkey = l1SeqId
+        var callBack = characteristicValueWrtieBlocks.blockkey
+        if(callBack){
+          var cmd = (seqId >> 8) & 0xFF;
+          var key = seqId & 0xFF;
+          var haveRes = haveResDataWithCmd(cmd,key)
+          if(haveRes){
+            callBack(connectedDeviceId,null,null)
+          }
+        }
+
+     }else{
+       //TODO: 待扩展  //继续发送下一个packet
+      var info = "Need send next packet"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+     }
+     return
+
+  } else if (errFlag == 0 && ackFlag == 0) {// Packet
+    //应答Packet 已经接收到。这里可能是接收完整个Packet应答也有可能是每接收一个packet应答
+    sendSuccessAck(l1SeqId,null)
+  } else if (errFlag == 0, ackFlag == 1) {//Err ACK (resend pre packet data) 这里主要是如果发送的数据包有错误重新发送
+  //TODO: 待扩展
+    var info = "Receive err Ack Need Resend pre packet"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
+    return
+  }
+
+  //这里假设每个包都含有L1Header+L2Header 所以组合时后面的包需要去掉Header
+  if (!receiveData) {// First Receive Data
+    receivePayloadLength = l1PayloadLength
+    receiveData = value
+  }else{
+    var info = "Append Value"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
+    var headerSize = l1HeaderSize + l2HeaderSize
+    if(dataLength > headerSize){
+      var l2PayloadLength = dataLength - headerSize
+      if(l2PayloadLength > 0){
+        var l2ValueData = value.slice(headerSize)
+        receiveData = appendBuffer(receiveData,l2ValueData)
+      }
+
+    }
+  }
+
+  if (receiveData.byteLength == receivePayloadLength) {//已经接收完数据
+    var info = "Receive all Packet"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+    parseReceivedData(receiveData)
+
+  }
+
+}
+
+
+/*
+* 解析接收到的数据
+*/
+
+function parseReceivedData(data){
+  var l1HeaderSize = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
+  var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
+  var l1PayloadLength = data.byteLength - l1HeaderSize
+  if(l1PayloadLength > l2HeaderSize){
+    var blockKey = getCommandIDAndKeyWithPacketData(data)
+    var l1Payload = data.slice(l1HeaderSize)
+
+    var keyInfo = "Parse Block key is:" + blockKey
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+    var cmdBuffer = DataView(value, l1HeaderSize, 1)//data.slice(l1HeaderSize,l1HeaderSize+1)
+    var keyBuffer = DataView(value, l1HeaderSize+2,1)
+    var cmd = cmdBuffer.getUint8(0)
+    var key = keyBuffer.getUint8(0)
+     
+    var CMD_IDs = cmdPreDef.ZH_RealTek_CMD_ID
+    switch(cmd){
+      case (CMD_IDs.RealTek_CMD_Firmware):{
+
+      }
+      break;
+      case (CMD_IDs.RealTek_CMD_Setting):{
+
+
+      }
+      break;
+      case (CMD_IDs.RealTek_CMD_Bind):{
+
+      }
+      break;
+
+    }
+
+  }
+
+  clearReceiveDataCaches()
+
+
+}
+
+/* - Parse Set Cmd Data - */
+
+function getL2PayloadKeyWithL1PayLoad(l1Payload){
+  var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
+  var keyBuffer = DataView(l1Payload,l2HeaderSize , 1)
+  var key = keyBuffer.getUint8(0)
+  return key
+}
+
+/*
+*  Parse Set Cmd Data
+*/
+
+function parseSetCmdData(l1Payload, blockkey){
+  var key = getL2PayloadKeyWithL1PayLoad(l1Payload)
+  var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
+  var l2PayLoad = l1Payload.slice(2)
+  var Setting_Keys = cmdPreDef.ZH_RealTek_Setting_Key
+  switch(key){
+    case (Setting_Keys.RealTek_Key_Get_ALarmList_Rep):{
+      
+
+    }
+    break;
+  }
 
 
 }
@@ -782,12 +939,6 @@ function handleNotifyCharacteristic(serviceId, characteristic){
 
 /* - 组合协议包 - */
 
-function appendBuffer(buffer1, buffer2) {
-  var tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
-  tmp.set(new Uint8Array(buffer1), 0);
-  tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
-  return tmp.buffer;
-}
 
 /*
 * 获取发送的数据包
@@ -926,10 +1077,25 @@ function sendErrorAck(seq,callBack){
   sendDataToBandDevice({
     data: errorPacket,
     ackBool: true,
-    callBack: callBack
+    callBack: function(deviceId,error,result){
+       if(callBack){
+         callBack(deviceId,error,result)
+       }
+    }
   })
+}
 
-
+function sendSuccessAck(seq,callBack){
+  var sucPacket = getL1HeaderWithAckFlagBool(true,false,null,0,seq)
+  sendDataToBandDevice({
+    data: sucPacket,
+    ackBool: true,
+    callBack: function (deviceId, error, result) {
+      if (callBack) {
+        callBack(deviceId, error, result)
+      }
+    }
+  })
 }
 
 /* - 公共函数 - */
@@ -992,6 +1158,19 @@ function getSeqIDWithCommand(cmd,key){
   return result;
 }
 
+
+function checkCRC16WithData(data, crc){
+  var l1PayloadLength = data.byteLength
+  var uint8Array = new Uint8Array(data)
+  var crc16 = common.getCRC16WithValue(data)
+  if(crc == crc16){
+    return true
+  }else{
+    return false
+  }
+
+}
+
 /* - 命令函数 - */
 
 
@@ -1020,7 +1199,15 @@ function bindDeviceWithIdentifier(identifier,callBack){
   var key = cmdPreDef.ZH_RealTek_Bind_Key.RealTek_Key_Bind_Req
   var seqId = getSeqIDWithCommand(cmd,key)
   var packet = getL0PacketWithCommandId(cmd, key, keyValue, maxLength,false,false,seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: function(deviceId, error, result){
+      if(!error && result){
 
+      }
+    }
+  })
 
 }
 
@@ -1147,6 +1334,79 @@ function replaceReskey(key,cmd){
   }
 
   return key
+}
+
+/*
+* 当命令发送成功后手环端发送ACK后，根据此函数判断是否立即回调相应
+*/
+function haveResDataWithCmd(cmd,key){
+  var CMD_IDs = cmdPreDef.ZH_RealTek_CMD_ID
+  if (cmd == CMD_IDs.RealTek_CMD_Setting){
+    var Setting_Keys = cmdPreDef.ZH_RealTek_Setting_Key
+    switch(key){
+      case Setting_Keys.RealTek_Key_Set_Time:
+        return true
+      case Setting_Keys.RealTek_Key_Set_Alarm:
+        return true
+      case Setting_Keys.RealTek_Key_Set_StepTarget:
+        return true
+      case Setting_Keys.RealTek_Key_Set_UserProfile:
+        return true
+      case Setting_Keys.RealTek_Key_Set_Sit_Long_OnOff:
+        return true
+      case Setting_Keys.RealTek_Key_Set_PhoneOS:
+        return true
+      case Setting_Keys.RealTek_Key_Set_TurnLight_OnOff:
+       return true
+      case Setting_Keys.RealTek_Key_Set_IncomingTel_OnOff:
+       return true
+      case Setting_Keys.RealTek_Key_Set_ScreenOrientation:
+       return true
+      
+
+    }
+  } else if (cmd == CMD_IDs.RealTek_CMD_FactoryTest){
+    var Factory_Keys = cmdPreDef.ZH_RealTek_FacTest_Key
+    switch(key){
+      case Factory_Keys.ZH_RealTek_FacTest_Key:
+        return true
+    }
+  } else if (cmd == CMD_IDs.RealTek_CMD_SportData){
+    var SportData_Keys = cmdPreDef.ZH_RealTek_Sport_Key
+    switch(key){
+      case SportData_Keys.RealTek_Key_Set_SportData_Syc_OnOff:
+        return true
+      case SportData_Keys.RealTek_Key_HR_OneTime:
+        return true
+      case SportData_Keys.RealTek_Key_HR_Continuous:
+        return true
+      case SportData_Keys.RealTek_Key_Today_SportStatus_Syc:
+        return true
+      case SportData_Keys.RealTek_Key_Last_SportStatus_Syn:
+        return true
+      case SportData_Keys.RealTek_Key_BP_Req:
+        return true
+    }
+  } else if (cmd == CMD_IDs.RealTek_CMD_Control){
+    var Control_Keys = cmdPreDef.ZH_RealTek_Control_Key
+    switch(key){
+      case Control_Keys.RealTek_Key_Control_Camera_Status_Req:
+        return true
+    }
+  } else if (cmd == CMD_IDs.RealTek_CMD_Bind){
+    var Bind_Keys = cmdPreDef.ZH_RealTek_Bind_Key
+    switch(key){
+      case Bind_Keys.RealTek_Key_UnBind:
+       return true
+    }
+  } else if (cmd == CMD_IDs.RealTek_CMD_Remind){
+    var Remind_Keys = cmdPreDef.ZH_RealTek_Remind_Key
+    switch(key){
+      case Remind_Keys.RealTek_Key_Universal_Message:
+        return true
+    }
+  }
+
 }
 
 // 对外可见模块

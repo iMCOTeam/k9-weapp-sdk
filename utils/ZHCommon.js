@@ -127,9 +127,10 @@ let crc16_table = [
 ]
 
 
-function getCRC16WithValue(value,len){
+function getCRC16WithValue(value){
   var crc = 0;
   var index = 0;
+  var len = value.length
   while (len--) {
     crc = (crc >> 8) ^ crc16_table[(crc ^ value[index]) & 0xff];
     index ++;
