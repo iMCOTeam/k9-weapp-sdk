@@ -1,5 +1,6 @@
 const util = require('../../utils/util.js')
-
+const manager = require("../../utils/ZHBTManager.js")
+let preModel = require("../../utils/ZHBTModel.js")
 
 Page({
 
@@ -58,12 +59,92 @@ Page({
 
   
   clickBindCmd: function (event){
+    var that  = this
     var functionMode = event.target.dataset.functionmode
     console.log("click functionMode", functionMode)
-    
+    var Function_Keys = util.ZHFunctionMode
+    var identifier = "a_test_user"
+    switch(functionMode){
+      case (Function_Keys.ZHLogin):{
+        that.loginWithIdentifier(identifier)
+      }
+      break;
+      case (Function_Keys.ZHBind):{
+        that.bindDeviceWithIdentifier(identifier)
+
+      }
+      break;
+    }
   },
 
+  /* - Functions - */
 
+
+
+  /*
+  * Login
+  */
+  loginWithIdentifier: function (identifier){
+    wx.showLoading({
+      title: 'Login...',
+    })
+    manager.loginDeviceWithIdentifier(identifier,function(device,error,result){
+      wx.hideLoading()
+      if(error){
+        wx.showToast({
+          title: error.errMsg,
+        })
+      }else{
+        if(result){
+          var Login_Status = preModel.ZH_RealTek_Login_Status
+          if (result == Login_Status.RealTek_Login_Success){
+            wx.showToast({
+              title: "Login success indicates that it is already bound",
+            })
+          } else if (result == Login_Status.RealTek_Login_TimeOut){
+            wx.showToast({
+              title: "The user ID is inconsistent and the login fails",
+            })
+          }
+
+        }
+      }
+    })
+  },
+
+  /*
+  * Bind
+  */
+
+  bindDeviceWithIdentifier: function (identifier){
+    // wx.showLoading({
+    //   title: 'Login...',
+    // })
+    manager.bindDeviceWithIdentifier(identifier, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      }else{
+        if (result) {
+          var Bind_Status = preModel.ZH_RealTek_Bind_Status
+          if (result == Bind_Status.RealTek_Bind_Success) {
+            wx.showToast({
+              title: "Bind Success",
+            })
+          } else if (result == Login_Status.RealTek_Bind_Faild) {
+            wx.showToast({
+              title: "Operation Timeout failed",
+            })
+          }
+
+        }
+      }
+
+    })
+
+  },
 
   /**
    * 生命周期函数--监听页面加载
