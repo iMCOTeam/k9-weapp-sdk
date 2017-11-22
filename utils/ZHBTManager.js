@@ -478,6 +478,7 @@ tips: 并行调用多次读写接口存在读写失败的可能性
 */
 
 function writeBLECharacteristicValue(obj){
+  common.printLogWithBuffer(obj.value, "writeBLECharacteristicValue")
   wx.writeBLECharacteristicValue({
     deviceId: obj.deviceId,
     serviceId: obj.serviceId,
@@ -550,7 +551,6 @@ function onBLEConnectionStateChange(obj){
 
 function onBLECharacteristicValueChange(){
   wx.onBLECharacteristicValueChange(function(res){
-    console.log("onBLECharacteristicValueChange:",JSON.stringify(res))
     handleCharacteristicValue(res)
   })
 }
@@ -595,7 +595,7 @@ function handleCharacteristicValue(obj){
       OTApatchVersion = version   
       var info = "read RealTek_OTAPatchVersion_CharUUID Success-" + version
 
-      console.log("read RealTek_OTAPatchVersion_CharUUID Success-",version)
+      console.log("read RealTek_OTAPatchVersion_CharUUIDchcSuccess-",version)
 
     }
     if (charUUIDString.indexOf(preDefChar.RealTek_OTAAppVersion_CharUUID) != -1) {
@@ -626,38 +626,52 @@ function handleReceivedData(value){
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
     return
   }
-  var l1HeaderMagicBuf = DataView(value,0,1) //value.slice(0, 1)
-  var l1AckVersionBuf = DataView(value, 1, 1)//value.slice(1,2)
-  var l1PayloadBuf = DataView(value, 2, 2) //value.slice(2,4)
-  var l1CRCBuf = DataView(value, 4, 2)//value.slice(4,6)
-  var l1SeqIdBuf = DataView(value, 6, 2) //value.slice(6)
+  common.printLogWithBuffer(value,"handleReceivedData")
+  
+  var l1HeaderMagicBuf = new DataView(value,0,1) //value.slice(0, 1)
+
+  var l1AckVersionBuf = new DataView(value, 1, 1)//value.slice(1,2)
+  var l1PayloadBuf = new DataView(value, 2, 2) //value.slice(2,4)
+  var l1CRCBuf = new DataView(value, 4, 2)//value.slice(4,6)
+  var l1SeqIdBuf = new DataView(value, 6, 2) //value.slice(6)
+  
 
   var l1HeaderMagic = l1HeaderMagicBuf.getUint8(0)
   var l1AckVersion = l1AckVersionBuf.getUint8(0)
-  var l1Payload = l1PayloadBuf.getUint16(0,littleEndian)
-  var l1CRC = l1CRCBuf.getUint16(0,littleEndian)
-  var l1SeqId = l1SeqIdBuf.getUint16(0,littleEndian)
 
+  var l1Payload = l1PayloadBuf.getUint16(0,false)
+  var l1CRC = l1CRCBuf.getUint16(0, false)
+  var l1SeqId = l1SeqIdBuf.getUint16(0, false)
   var errFlag = (l1AckVersion >> 5) & 0x1
   var ackFlag = (l1AckVersion >> 4) & 0x1
 
-  var info = "SeqId:" + l1SeqId + " CRC16:" + l1CRC + " errFlag:" + errFlag + " ackFlag:" + ackFlag
+  var l1PayloadLength = l1Payload
+
+  
+
+  var info = "SeqId:" + l1SeqId + " CRC16:" + l1CRC + " errFlag:" + errFlag + " ackFlag:" + ackFlag + " l1PayloadLength: " + l1PayloadLength 
   common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
 
   if (l1HeaderMagic != cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Magic){
     sendErrorAck(l1SeqId,null)
+    info = "l1HeaderMagic is error" + l1HeaderMagic
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
     return
   }
 
   //CRC16 Check
-  var l1PayloadLength = dataLength - l1HeaderSize
   if(l1PayloadLength > 0){
     var l1PayloadData = value.slice(l1HeaderSize)
     var checkCRC16Bool =  checkCRC16WithData(l1PayloadData,l1CRC)
     if(!checkCRC16Bool){
       sendErrorAck(l1SeqId,null)
+      info = "checkCRC16Bool is not equal" + l1CRC 
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
       return
     }
+  }else{
+    info = "l1PayloadLength is zero" + l1SeqId
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
   }
 
   if (errFlag == 0 && ackFlag == 1) { //Suc ACK
@@ -665,11 +679,16 @@ function handleReceivedData(value){
         var blockkey = l1SeqId
         var callBack = characteristicValueWrtieBlocks[blockkey]
         if(callBack){
-          var cmd = (seqId >> 8) & 0xFF;
-          var key = seqId & 0xFF;
+          var cmd = (l1SeqId >> 8) & 0xFF;
+          var key = l1SeqId & 0xFF;
           var haveRes = haveResDataWithCmd(cmd,key)
           if(haveRes){
+            info = "haveRes immediate callBack"  + blockkey
+            common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
             callBack(connectedDevice,null,null)
+          }else{
+            info = "haveRes not immediate callBack" + blockkey
+            common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
           }
         }
 
@@ -694,6 +713,8 @@ function handleReceivedData(value){
   if (!receiveData) {// First Receive Data
     receivePayloadLength = l1PayloadLength
     receiveData = value
+    var resInfo = "First Receive Packet"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
   }else{
     var info = "Append Value"
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
@@ -708,11 +729,15 @@ function handleReceivedData(value){
     }
   }
 
-  if (receiveData.byteLength == receivePayloadLength) {//已经接收完数据
+  if (receiveData.byteLength == (receivePayloadLength + l1HeaderSize)) {//已经接收完数据
     var info = "Receive all Packet"
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+    
     parseReceivedData(receiveData)
 
+  }else{
+    var info = "Receive Packet is not finished:" +  receiveData.byteLength + receivePayloadLength
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
   }
 
 }
@@ -730,10 +755,13 @@ function parseReceivedData(data){
     var blockKey = getCommandIDAndKeyWithPacketData(data)
     var l1Payload = data.slice(l1HeaderSize)
 
+    common.printLogWithBuffer(l1Payload,"paser l1Payload")
+    
+
     var keyInfo = "Parse Block key is:" + blockKey
-    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
-    var cmdBuffer = DataView(value, l1HeaderSize, 1)//data.slice(l1HeaderSize,l1HeaderSize+1)
-    var keyBuffer = DataView(value, l1HeaderSize+2,1)
+    common.printDebugInfo(keyInfo, common.ZH_Log_Level.ZH_Log_Verblose)
+    var cmdBuffer = new DataView(data, l1HeaderSize, 1)//data.slice(l1HeaderSize,l1HeaderSize+1)
+    var keyBuffer = new DataView(data, l1HeaderSize+2,1)
     var cmd = cmdBuffer.getUint8(0)
     var key = keyBuffer.getUint8(0)
      
@@ -767,7 +795,7 @@ clearReceiveDataCaches()
 
 function getL2PayloadKeyWithL1PayLoad(l1Payload){
   var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
-  var keyBuffer = DataView(l1Payload,l2HeaderSize , 1)
+  var keyBuffer = new DataView(l1Payload,l2HeaderSize , 1)
   var key = keyBuffer.getUint8(0)
   return key
 }
@@ -778,13 +806,14 @@ function getL2PayloadKeyWithL1PayLoad(l1Payload){
 */
 
 function parseBindCmdData(l1Payload,blockkey){
+  console.log("call parseBindCmdData")
   var key = getL2PayloadKeyWithL1PayLoad(l1Payload)
   var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
   var l2PayLoad = l1Payload.slice(2)
   var Bind_Keys = cmdPreDef.ZH_RealTek_Bind_Key
   switch(key){
     case Bind_Keys.RealTek_Key_Bind_Rep:{
-      var statusCode = DataView(l2PayLoad, 3, 1).getUint8(0)
+      var statusCode = new DataView(l2PayLoad, 3, 1).getUint8(0)
       var info = "Bind Res status:" + statusCode
       common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
       var callBack = characteristicValueWrtieBlocks[blockkey]
@@ -797,7 +826,7 @@ function parseBindCmdData(l1Payload,blockkey){
     break;
 
     case Bind_Keys.RealTek_Key_Login_Rep:{
-      var statusCode = DataView(l2PayLoad, 3, 1).getUint8(0)
+      var statusCode = new DataView(l2PayLoad, 3, 1).getUint8(0)
       var info = "Bind Res status:" + statusCode
       common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
       var callBack = characteristicValueWrtieBlocks[blockkey]
@@ -832,7 +861,7 @@ function parseSetCmdData(l1Payload, blockkey){
     }
     break;
     case (Setting_Keys.RealTek_Key_Get_Sit_Long_Rep):{
-      var statusCode = DataView(l2PayLoad, 3, 1).getUint8(0)
+      var statusCode = new DataView(l2PayLoad, 3, 1).getUint8(0)
       var onEnable = true
       if(statusCode == 0){
         onEnable = false
@@ -847,7 +876,7 @@ function parseSetCmdData(l1Payload, blockkey){
     break;
 
     case (Setting_Keys.RealTek_Key_Get_TurnLight_Rep):{
-      var statusCode = DataView(l2PayLoad, 3, 1).getUint8(0)
+      var statusCode = new DataView(l2PayLoad, 3, 1).getUint8(0)
       var onEnable = true
       if (statusCode == 0) {
         onEnable = false
@@ -862,7 +891,7 @@ function parseSetCmdData(l1Payload, blockkey){
     break;
 
     case (Setting_Keys.RealTek_Key_Get_ScreenOrientationRep):{
-      var orientation = DataView(l2PayLoad, 3, 1).getUint8(0)
+      var orientation = new DataView(l2PayLoad, 3, 1).getUint8(0)
       var callBack = characteristicValueWrtieBlocks[blockkey]
       if (callBack) {
         callBack(connectedDevice, null, orientation)
@@ -894,8 +923,8 @@ function getAlarmsWithValue(value){
   var arlarmValueLength = cmdPreDef.DF_RealTek_Header_Predef.DF_RealTek_AlarmValue_Length
   var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
 
-  var valueLengthPreBuffer = DataView(value,1, 1)
-  var valueLengthLateBuffer = DataView(value,2,1)
+  var valueLengthPreBuffer = new DataView(value,1, 1)
+  var valueLengthLateBuffer = new DataView(value,2,1)
   var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
   
   var alarmsNum = valueLength/arlarmValueLength
@@ -907,14 +936,14 @@ function getAlarmsWithValue(value){
   var alarms = new Array()
   var alarmValue = value.slice(l2PayloadHeaderSize)
   for(var index = 0; index < alarmsNum; index++){
-    var year = (DataView(alarmValue, index * arlarmValueLength, 1).getUint8(0) & 0xfc) >> 2
-    var month = ((DataView(alarmValue, index * arlarmValueLength, 1).getUint8(0) & 0x3) << 2) + ((DataView(alarmValue, index * arlarmValueLength + 1, 1).getUint8(0) & 0xc0) >> 6)
-    var day = (DataView(alarmValue, index * arlarmValueLength+1, 1).getUint8(0) & 0x3f) >> 1
-    var hour = ((DataView(alarmValue, index * arlarmValueLength + 1, 1).getUint8(0) & 0x1) << 4) + ((DataView(alarmValue, index * arlarmValueLength + 2, 1).getUint8(0) & 0xf0) >> 4)
-    var minute = ((DataView(alarmValue, index * arlarmValueLength + 2, 1).getUint8(0) & 0x0f) << 2) + ((DataView(alarmValue, index * arlarmValueLength + 3, 1).getUint8(0) & 0xc0) >> 6)
+    var year = (new DataView(alarmValue, index * arlarmValueLength, 1).getUint8(0) & 0xfc) >> 2
+    var month = ((new DataView(alarmValue, index * arlarmValueLength, 1).getUint8(0) & 0x3) << 2) + ((new DataView(alarmValue, index * arlarmValueLength + 1, 1).getUint8(0) & 0xc0) >> 6)
+    var day = (new DataView(alarmValue, index * arlarmValueLength+1, 1).getUint8(0) & 0x3f) >> 1
+    var hour = ((new DataView(alarmValue, index * arlarmValueLength + 1, 1).getUint8(0) & 0x1) << 4) + ((new DataView(alarmValue, index * arlarmValueLength + 2, 1).getUint8(0) & 0xf0) >> 4)
+    var minute = ((new DataView(alarmValue, index * arlarmValueLength + 2, 1).getUint8(0) & 0x0f) << 2) + ((new DataView(alarmValue, index * arlarmValueLength + 3, 1).getUint8(0) & 0xc0) >> 6)
 
-    var index = (DataView(alarmValue, index * arlarmValueLength + 3, 1).getUint8(0) & 0x38) >> 3
-    var dayFlags = DataView(alarmValue, index * arlarmValueLength + 4, 1).getUint8(0) & 0x7f
+    var index = (new DataView(alarmValue, index * arlarmValueLength + 3, 1).getUint8(0) & 0x38) >> 3
+    var dayFlags = new DataView(alarmValue, index * arlarmValueLength + 4, 1).getUint8(0) & 0x7f
     year = year + preModel.DF_RealTek_Date_Cut_Year
 
 
@@ -944,20 +973,20 @@ function getAlarmsWithValue(value){
 
 function getAllFunctionsWithValue(value){
   var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
-  var valueLengthPreBuffer = DataView(value, 1, 1)
-  var valueLengthLateBuffer = DataView(value, 2, 1)
+  var valueLengthPreBuffer = new DataView(value, 1, 1)
+  var valueLengthLateBuffer = new DataView(value, 2, 1)
   var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
   if(valueLength < 4){
     var info = "Get All Functions length is less than 4"
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
   }
 
-  var hasFakeBloodPressure = DataView(value, 3, 1).getUint8(0) & 0x1
-  var hasRealBloodPressure = (DataView(value, 3, 1).getUint8(0) >> 1) & 0x1
-  var hasHRM = (DataView(value, 3, 1).getUint8(0) >> 2) & 0x1
-  var hasScreenSwitch = (DataView(value, 3, 1).getUint8(0) >> 3) & 0x1
-  var hasStep = (DataView(value, 3, 1).getUint8(0) >> 4) & 0x1
-  var hasSleep = (DataView(value, 3, 1).getUint8(0) >> 5) & 0x1
+  var hasFakeBloodPressure = new DataView(value, 3, 1).getUint8(0) & 0x1
+  var hasRealBloodPressure = (new DataView(value, 3, 1).getUint8(0) >> 1) & 0x1
+  var hasHRM = (new DataView(value, 3, 1).getUint8(0) >> 2) & 0x1
+  var hasScreenSwitch = (new DataView(value, 3, 1).getUint8(0) >> 3) & 0x1
+  var hasStep = (new DataView(value, 3, 1).getUint8(0) >> 4) & 0x1
+  var hasSleep = (new DataView(value, 3, 1).getUint8(0) >> 5) & 0x1
 
   connectedDevice.hasBloodPressureFunc = hasFakeBloodPressure || hasRealBloodPressure
   connectedDevice.hasHRMFunc = hasHRM
@@ -1000,7 +1029,6 @@ function getAllServices(){
 */
 
 function getAllCharacteristics(serviceUUID){
-  console.log("call getAllCharacteristics-", serviceUUID)
   var deviceId = connectedDeviceId
    getBLEDeviceCharacteristics({
     deviceId: deviceId,
@@ -1055,7 +1083,6 @@ function handleCharacteristic(serviceUUID,characteristic){
 
   if (charUUIDString.indexOf(preDefChar.RealTek_OTAPatchVersion_CharUUID) != -1){
     OTAPatchVersioCharObj = characteristic
-    console.log("find RealTek_OTAPatchVersion_CharUUID -", characteristic.uuid)
     if (characteristic.properties.read) {
       readBLECharacteristicValue({
         deviceId: deviceId,
@@ -1110,7 +1137,8 @@ function handleCharacteristic(serviceUUID,characteristic){
 /* - Notify特征 - */
 
 function handleNotifyCharacteristic(serviceId, characteristic){
-  if (characteristic.notify){
+  
+  if (characteristic.properties.notify){
     var deviceId = connectedDeviceId
     notifyBLECharacteristicValueChange({
       deviceId:deviceId,
@@ -1130,6 +1158,8 @@ function handleNotifyCharacteristic(serviceId, characteristic){
 
     })
 
+  }else{
+    console.log("call handleNotifyCharacteristic is have not notify", characteristic.uuid)
   }
 }
 
@@ -1140,9 +1170,7 @@ function handleNotifyCharacteristic(serviceId, characteristic){
 * 获取发送的数据包
 */
 function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errFlagBool, ackFlagBool, sequenceId){
-  console.log("call getL0PacketWithCommandId")
   var l2Header = getL2HeaderWithCommandId(commandId)
-
   var l2Payload = getL2Payload(key,keyValueLength,keyValue)
   var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size;
   var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
@@ -1151,8 +1179,8 @@ function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errF
   if(l1Payload.byteLength != l1PayloadLength){
     common.printDebugInfo("L1 payload init fail", common.ZH_Log_Level.ZH_Log_Error)
   }else{
-    l1Payload.set(l2Header,0)
-    l1Payload.set(l2Payload, l2HeaderSize)
+    l1Payload.set(new Uint8Array(l2Header),0)
+    l1Payload.set(new Uint8Array(l2Payload), l2HeaderSize)
     var l1Header = getL1HeaderWithAckFlagBool(ackFlagBool,errFlagBool,l1Payload,l1PayloadLength,sequenceId)
     var l1HeaderLength = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
     var l1PacketLength = l1HeaderLength + l1PayloadLength
@@ -1160,11 +1188,12 @@ function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errF
     if(l1Packet.byteLength != l1PacketLength){
       common.printDebugInfo("L1 packet init fail", common.ZH_Log_Level.ZH_Log_Error)
     }else{
-      l1Packet.set(l1Header,0)
+      l1Packet.set(new Uint8Array(l1Header),0)
       l1Packet.set(l1Payload, l1HeaderLength)
       
     }
-    return l1Packet
+    common.printLogWithBuffer(l1Packet.buffer, "Send Packet")
+    return l1Packet.buffer
 
   }
 
@@ -1175,36 +1204,51 @@ function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errF
 */
 function getL1HeaderWithAckFlagBool(ackBool, errorBool, L1Payload, L1PayloadLength, sequenceId){
   var l1HeaderSize = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Size
-  var l1Header = new Uint8Array(l1HeaderSize)
-  if(l1Header.byteLength != l1HeaderSize){
+  var buffer = new ArrayBuffer(l1HeaderSize)
+  if(buffer.byteLength != l1HeaderSize){
     common.printDebugInfo("L1 Header init fail", common.ZH_Log_Level.ZH_Log_Error)
   }else{
     var magic = cmdPreDef.DF_RealTek_L1_Header.DF_RealTek_L1_Header_Magic
     var ackVersion = getVersionACKErrorValueWithAck(ackBool,errorBool)
     var l1HeaderOrder = cmdPreDef.L1_Header_ByteOrder
-    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Magic_Pos] = magic
-    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Protocol_Version_Pos] = ackVersion
-    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_HighByte_Pos] = (L1PayloadLength >> 8) & 0xFF
-    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_LowByte_Pos] = L1PayloadLength & 0xFF
+    var view8 = new Uint8Array(buffer,0,2)
+    var payloadView = new DataView(buffer,2,2)
+    var crcView = new DataView(buffer,4,2)
+    var seqView = new DataView(buffer,6,2)
+
+
+    //l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Magic_Pos] = magic
+    //l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Protocol_Version_Pos] = ackVersion
+    view8[0] = magic
+    view8[1] = ackVersion
+    payloadView.setInt16(0,L1PayloadLength,false)
+    
+    // l1Header[1] = ackVersion
+    // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_HighByte_Pos] = (L1PayloadLength >> 8) & 0xFF
+    // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_LowByte_Pos] = L1PayloadLength & 0xFF
 
     if((L1PayloadLength > 0) && L1Payload){
       var L1PayloadArray = new Uint8Array(L1Payload)
       var crc16 = common.getCRC16WithValue(L1PayloadArray)
-      l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_HighByte_Pos] = (crc16 >> 8) & 0xFF
-      l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_LowByte_Pos] = crc16 & 0xFF
+      crcView.setInt16(0,crc16,false)
+
+    
+      //l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_HighByte_Pos] = (crc16 >> 8) & 0xFF
+      //l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_LowByte_Pos] = crc16 & 0xFF
 
     }else{
-      l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_HighByte_Pos] = 0
-      l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_LowByte_Pos] = 0
+      // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_HighByte_Pos] = 0
+      // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_LowByte_Pos] = 0
+      crcView.setInt16(0,0,false)
     }
 
-    l1Header[l1HeaderOrder.DF_RealTek_L1_Header_SeqID_HighByte_Pos] = (sequenceId >> 8) & 0xFF
-    l1Header[l1Header.DF_RealTek_L1_Header_SeqID_LowByte_Pos] = sequenceId & 0xFF
+
+    // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_SeqID_HighByte_Pos] = (sequenceId >> 8) & 0xFF
+    // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_SeqID_LowByte_Pos] = sequenceId & 0xFF
+    seqView.setInt16(0,sequenceId,false)
 
   }
-
-  return l1Header.buffer
-
+  return buffer
 }
 
 /*
@@ -1249,22 +1293,22 @@ function getL2HeaderWithCommandId(commandId)
 */
 function getL2Payload(key, keyValueLength, keyValue)
 {
-  console.log("call getL2Payload")
   var l2Payload_Header_Size = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
-  var loadSize = l2Payload_Header_Size + keyValueLength
-  var l2PayLoad = new Uint8Array(loadSize)
-  if (l2PayLoad.byteLength != loadSize) {
-    common.printDebugInfo("l2 PayLoad init fail", common.ZH_Log_Level.ZH_Log_Error)
+  var loadSize = l2Payload_Header_Size
+  var l2PayLoadHeader = new Uint8Array(loadSize)
+  var l2PayLoad = null
+  if (l2PayLoadHeader.byteLength != loadSize) {
+    common.printDebugInfo("l2 PayLoadHeader init fail", common.ZH_Log_Level.ZH_Log_Error)
   } else {
-    l2PayLoad[0] = key
-    l2PayLoad[1] = keyValueLength >> 8 & 0x1;
-    l2PayLoad[2] = keyValueLength & 0xFF;
+    l2PayLoadHeader[0] = key
+    l2PayLoadHeader[1] = keyValueLength >> 8 & 0x1;
+    l2PayLoadHeader[2] = keyValueLength & 0xFF;
     if((keyValueLength >0) && keyValue){
-      l2PayLoad.set(l2Payload_Header_Size,keyValue)
+     l2PayLoad =  appendBuffer(l2PayLoadHeader.buffer,keyValue)
     }
   }
-
-  return l2PayLoad.buffer
+  //common.printLogWithBuffer(l2PayLoad, "l2Payload buffer ")
+  return l2PayLoad
 
 }
 
@@ -1285,6 +1329,9 @@ function sendErrorAck(seq,callBack){
 }
 
 function sendSuccessAck(seq,callBack){
+  var info = "sendSuccessAck seq: " + seq
+  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+
   var sucPacket = getL1HeaderWithAckFlagBool(true,false,null,0,seq)
   sendDataToBandDevice({
     data: sucPacket,
@@ -1307,15 +1354,37 @@ function getStringWithBuffer(buf) {
 
 // 字符串转为ArrayBuffer对象，参数为字符串
 function getBufferWithString(str) {
-    var buf = new ArrayBuffer(str.length*2) // 每个字符占用2个字节
-    var bufView = new Uint16Array(buf)
+    var strLength = GetBytes(str)
+    var buf = new ArrayBuffer(strLength) 
+    var bufView = new Uint8Array(buf)
     var strLen = str.length
     for (var i=0; i<strLen; i++) {
          bufView[i] = str.charCodeAt(i);
     }
     return buf
+
+  // var uintArray = [];
+  // var strLen = str.length
+  // for (var i = 0; i < strLen; i++) {
+  //   uintArray.push(str.charCodeAt(i))
+  // }
+  // var bufView = Uint8Array(uintArray)
+  // return bufView.buffer
+
+    
 }
 
+
+//求一个字符串的字节长度
+function GetBytes(str) {
+  var len = str.length;
+  var bytes = len;
+  for (var i = 0; i < len; i++) {
+    //console.log(str[i],str.charCodeAt(i));
+    if (str.charCodeAt(i) > 255) bytes++;
+  }
+  return bytes;
+}
 /*
 * 无连接发送命令时回调
 */
@@ -1362,8 +1431,9 @@ function getSeqIDWithCommand(cmd,key){
 function checkCRC16WithData(data, crc){
   var l1PayloadLength = data.byteLength
   var uint8Array = new Uint8Array(data)
-  var crc16 = common.getCRC16WithValue(data)
+  var crc16 = common.getCRC16WithValue(uint8Array)
   if(crc == crc16){
+
     return true
   }else{
     return false
@@ -1470,10 +1540,8 @@ function loginDeviceWithIdentifier(identifier,callBack){
     dataBuffer = dataBuffer.slice(0, maxLength)
   }
 
-  var loginByte = new Uint8Array(maxLength)
-  loginByte.set(dataBuffer, 0)
-
-  var keyValue = loginByte;
+  var keyValue = dataBuffer;
+  common.printLogWithBuffer(dataBuffer,"login value")
   var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Bind
   var key = cmdPreDef.ZH_RealTek_Bind_Key.RealTek_Key_Login_Req
   var seqId = getSeqIDWithCommand(cmd, key)
@@ -1532,7 +1600,7 @@ function sendDataToBandDevice(obj){
     var serviceUUID = preDefService.RealTek_ServiceUUIDs.RealTek_BroadServiceUUID
     var writeCharUUID = writeCharObj.uuid
     if(!ackBool && callBack){
-      common.printLogWithBuffer(data,"Send Packet")
+      
       var key = getCommandIDAndKeyWithPacketData(data) //获取command and key 组合数字作为回调函数的key
       var keyInfo = "Save Block key is: " + key
       common.printDebugInfo(keyInfo, common.ZH_Log_Level.ZH_Log_Info)
