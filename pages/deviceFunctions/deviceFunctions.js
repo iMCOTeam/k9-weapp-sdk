@@ -160,7 +160,6 @@ Page({
     wx.showLoading({
       title: 'UnBind...',
     })
-    
     manager.unBindDeviceonFinished(function (device, error, result){
       wx.hideLoading()
       if (error) {
@@ -179,29 +178,26 @@ Page({
   /*
   * Disconnect
   */
-
   disconnect: function(){
     wx.showLoading({
       title: 'Disconnect...',
     })
-    var devie = manager.connectedDevice
-    if(devie){
-      manager.cancelPeripheralConnection(devie.deviceId, function(device, error, result){
-        wx.hideLoading
-        if(error){
-          wx.showToast({
-            title: error.errMsg,
-          })
+    
+      
+    manager.cancelPeripheralConnection(function(device, error, result){
+      wx.hideLoading
+      if(error){
+        wx.showToast({
+          title: error.errMsg,
+        })
 
-        }else{
-          wx.showToast({
-            title: 'Disconnect success',
-          })
-
-        }
+      }else{
+        wx.showToast({
+          title: 'Disconnect success',
       })
 
     }
+    })
   },
 
   /**
@@ -227,6 +223,14 @@ Page({
    * 生命周期函数--监听页面显示
    */
   onShow: function () {
+    var device = manager.getConnectedDevice()
+    if(device){
+      wx.showToast({
+        title: device.deviceId,
+      })
+    }else{
+      console.log("have not find device")
+    }
     
   },
 

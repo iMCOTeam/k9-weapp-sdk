@@ -32,6 +32,11 @@ Page({
           title: res.errMsg,
         })
       }else{
+        if (device){
+          console.log("connected device have", device.deviceId)
+        }else{
+          console.log("connected device not have")
+        }
         wx.navigateTo({
           url: '../deviceFunctions/deviceFunctions?deviceId=' + deviceId,
         })

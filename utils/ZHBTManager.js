@@ -8,12 +8,12 @@ var discovering = false  //是否处于搜索状态
 var characteristicValueWrtieBlocks = []        //回调函数
 var bluetoolthavailable = false //蓝牙适配器是否可用
 var connectedDeviceId = null  //已连接设备ID
-var connectedDevice = null //已连接设备
+var connectedDevice = preModel.initDevice() //已连接设备
 var receiveData = null //接收的数据
 var receivePayloadLength = 0 //接收数据时的数据长度，用于判断Notify的数据是否接收完整
 var receiveDataSeq = 0 //接收数据时的序列号
 
-var Singleton = 1
+var Singleton = null
 
 var allServices = null //该设备所有服务
 var writeCharObj = null //发送命令特征
@@ -82,7 +82,7 @@ function initialBTManager(obj){
   // 监听低功耗蓝牙连接的错误事件，包括设备丢失，连接异常断开等等。
   onBLEConnectionStateChange(function (res){
     if (!res.connected){
-      console.log("bluetooth have disconnected with deviceId:${res.deviceId}")
+      console.log("bluetooth have disconnected with deviceId:", res.deviceId)
       clearCaches()
     }
   })
@@ -97,7 +97,6 @@ function initialBTManager(obj){
 */
 function clearCaches()
 {
- 
   discovering = false  
   characteristicValueWrtieBlocks = []
   bluetoolthavailable = false
@@ -1396,6 +1395,10 @@ function checkCRC16WithData(data, crc){
 
 /* - 命令函数 - */
 
+function getConnectedDevice(){
+  return connectedDevice
+}
+
 /*
 * 连接低功耗蓝牙设备
 */
@@ -1405,9 +1408,14 @@ function createBLEConnection(obj) {
     deviceId: obj.deviceId,
     success: function (res) {
       connectedDeviceId = obj.deviceId
-      connectedDevice = preModel.initDevice()
+
+      if(!connectedDevice){
+        connectedDevice = preModel.initDevice()
+
+      }
       connectedDevice.deviceId = connectedDeviceId
       connectedDevice.connected = true
+      
 
       //获取所有特征服务
       getAllServices()
@@ -1469,6 +1477,7 @@ function connectPeripheral(deviceId,callBack){
       }
     },
     fail: function (res) {
+      console.log("connectPeripheral fail")
       var error = getWechatCustomError(res)
       if(callBack){
         callBack(connectedDevice,error,null)
@@ -1481,9 +1490,13 @@ function connectPeripheral(deviceId,callBack){
 * 断开连接
 */
 
-function cancelPeripheralConnection(deviceId, callBack){
+function cancelPeripheralConnection(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
   closeBLEConnection({
-    deviceId: deviceId,
+    deviceId: connectedDeviceId,
     success: function (res) {
       if (callBack) {
         callBack(connectedDevice, null, null)
@@ -1838,7 +1851,8 @@ function haveResDataWithCmd(cmd,key){
 
 // 对外可见模块
 module.exports = {
-  connectedDevice: connectedDevice,
+  getConnectedDevice: getConnectedDevice,
+  connectedDeviceId: connectedDeviceId,
   Singleton: Singleton,
   initialBTManager: initialBTManager,
   openBluetoothAdapter : openBluetoothAdapter,
