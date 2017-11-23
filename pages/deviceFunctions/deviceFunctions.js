@@ -74,6 +74,15 @@ Page({
 
       }
       break;
+      case (Function_Keys.ZHCancelBind):{
+        that.unBind()
+
+      }
+      break;
+      case (Function_Keys.ZHCancelConnect):{
+        that.disconnect()
+      }
+      break;
     }
   },
 
@@ -95,18 +104,16 @@ Page({
           title: error.errMsg,
         })
       }else{
-        if(result){
-          var Login_Status = preModel.ZH_RealTek_Login_Status
-          if (result == Login_Status.RealTek_Login_Success){
-            wx.showToast({
-              title: "Login success indicates that it is already bound",
-            })
-          } else if (result == Login_Status.RealTek_Login_TimeOut){
-            wx.showToast({
-              title: "The user ID is inconsistent and the login fails",
-            })
-          }
-
+        
+        var Login_Status = preModel.ZH_RealTek_Login_Status
+        if (result == Login_Status.RealTek_Login_Success){
+          wx.showToast({
+            title: "Login success indicates that it is already bound",
+          })
+        } else if (result == Login_Status.RealTek_Login_TimeOut){
+          wx.showToast({
+            title: "The user ID is inconsistent and the login fails",
+          })
         }
       }
     })
@@ -117,9 +124,9 @@ Page({
   */
 
   bindDeviceWithIdentifier: function (identifier){
-    // wx.showLoading({
-    //   title: 'Login...',
-    // })
+    wx.showLoading({
+      title: 'Bind...',
+    })
     manager.bindDeviceWithIdentifier(identifier, function (device, error, result){
       wx.hideLoading()
       if (error) {
@@ -127,23 +134,74 @@ Page({
           title: error.errMsg,
         })
       }else{
-        if (result) {
-          var Bind_Status = preModel.ZH_RealTek_Bind_Status
-          if (result == Bind_Status.RealTek_Bind_Success) {
-            wx.showToast({
-              title: "Bind Success",
-            })
-          } else if (result == Login_Status.RealTek_Bind_Faild) {
-            wx.showToast({
-              title: "Operation Timeout failed",
-            })
-          }
-
+        
+        var Bind_Status = preModel.ZH_RealTek_Bind_Status
+        if (result == Bind_Status.RealTek_Bind_Success) {
+          wx.showToast({
+            title: "Bind Success",
+          })
+        } else if (result == Bind_Status.RealTek_Bind_Faild) {
+          wx.showToast({
+            title: "Operation Timeout failed",
+          })
         }
+
+        
       }
 
     })
 
+  },
+
+  /*
+  * UnBind
+  */
+  unBind: function(){
+    wx.showLoading({
+      title: 'UnBind...',
+    })
+    
+    manager.unBindDeviceonFinished(function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else{
+        wx.showToast({
+          title: "UnBind Success",
+        })
+      }
+    })
+
+  },
+
+  /*
+  * Disconnect
+  */
+
+  disconnect: function(){
+    wx.showLoading({
+      title: 'Disconnect...',
+    })
+    var devie = manager.connectedDevice
+    if(devie){
+      manager.cancelPeripheralConnection(devie.deviceId, function(device, error, result){
+        wx.hideLoading
+        if(error){
+          wx.showToast({
+            title: error.errMsg,
+          })
+
+        }else{
+          wx.showToast({
+            title: 'Disconnect success',
+          })
+
+        }
+      })
+
+    }
   },
 
   /**

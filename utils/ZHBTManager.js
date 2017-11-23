@@ -13,6 +13,7 @@ var receiveData = null //接收的数据
 var receivePayloadLength = 0 //接收数据时的数据长度，用于判断Notify的数据是否接收完整
 var receiveDataSeq = 0 //接收数据时的序列号
 
+var Singleton = 1
 
 var allServices = null //该设备所有服务
 var writeCharObj = null //发送命令特征
@@ -71,6 +72,7 @@ function initialBTManager(obj){
     if (!res.available){
       console.log("bluetooth adapter is not valid")
       bluetoolthavailable = false
+      clearCaches()
     }else{
       bluetoolthavailable = true
       console.log("bluetooth adapter is valid")
@@ -81,6 +83,7 @@ function initialBTManager(obj){
   onBLEConnectionStateChange(function (res){
     if (!res.connected){
       console.log("bluetooth have disconnected with deviceId:${res.deviceId}")
+      clearCaches()
     }
   })
 
@@ -94,6 +97,7 @@ function initialBTManager(obj){
 */
 function clearCaches()
 {
+ 
   discovering = false  
   characteristicValueWrtieBlocks = []
   bluetoolthavailable = false
@@ -333,63 +337,7 @@ function getConnectedBluetoothDevices(obj){
 }
 
 
-/*
-* 连接低功耗蓝牙设备
-*/
 
-function createBLEConnection(obj){
-  wx.createBLEConnection({
-    deviceId: obj.deviceId,
-    success: function(res) {
-      connectedDeviceId = obj.deviceId
-      connectedDevice = preModel.initDevice()
-      connectedDevice.identifier = connectedDeviceId
-      connectedDevice.connected = true
-      //获取所有特征服务
-      getAllServices()
-      if(obj.success){
-        obj.success(res);
-      }
-    },
-    fail: function (res) {
-      if (obj.fail) {
-        obj.fail(res)
-      }
-    },
-    complete: function (res) {
-      if (obj.complete) {
-        obj.complete(res)
-      }
-    }
-  })
-}
-
-
-/*
-* 断开与低功耗蓝牙设备的连接
-*/
-
-function closeBLEConnection(obj){
-  wx.closeBLEConnection({
-    deviceId: obj.deviceId,
-    success: function(res) {
-      if (obj.success) {
-        obj.success(res);
-      }
-    },
-    fail: function (res) {
-      if (obj.fail) {
-        obj.fail(res)
-      }
-    },
-    complete: function (res) {
-      if (obj.complete) {
-        obj.complete(res)
-      }
-    }
-
-  })
-}
 
 
 /*
@@ -827,7 +775,7 @@ function parseBindCmdData(l1Payload,blockkey){
 
     case Bind_Keys.RealTek_Key_Login_Rep:{
       var statusCode = new DataView(l2PayLoad, 3, 1).getUint8(0)
-      var info = "Bind Res status:" + statusCode
+      var info = "Login Res status:" + statusCode
       common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
       var callBack = characteristicValueWrtieBlocks[blockkey]
       if (callBack) {
@@ -1305,9 +1253,13 @@ function getL2Payload(key, keyValueLength, keyValue)
     l2PayLoadHeader[2] = keyValueLength & 0xFF;
     if((keyValueLength >0) && keyValue){
      l2PayLoad =  appendBuffer(l2PayLoadHeader.buffer,keyValue)
+     
+    }else{
+      l2PayLoad = l2PayLoadHeader.buffer
+      common.printDebugInfo("l2 PayLoad is null", common.ZH_Log_Level.ZH_Log_Info)
     }
   }
-  //common.printLogWithBuffer(l2PayLoad, "l2Payload buffer ")
+  common.printLogWithBuffer(l2PayLoad, "l2Payload buffer ")
   return l2PayLoad
 
 }
@@ -1389,7 +1341,7 @@ function GetBytes(str) {
 * 无连接发送命令时回调
 */
 function hasConnectDevice(callBack) {
-  if (connectedDeviceId) {
+  if (connectedDevice) {
     return true
   } else {
     if (callBack) {
@@ -1404,9 +1356,9 @@ function hasConnectDevice(callBack) {
 * 获取断开连接错误回调
 */
 function getDisconnectedError() {
-  var error = new Object()
-  error.errMsg = "The device is disconnected"
-  error.code = preModel.ZH_RealTek_Error_Code.ZHDisConnectedErrorCode
+  var code = preModel.ZH_RealTek_Error_Code.ZHDisConnectedErrorCode
+  var errMsg = "The device is disconnected"
+  var error = preModel.initError(code,errMsg)
   return error
 }
 
@@ -1414,9 +1366,10 @@ function getDisconnectedError() {
 * 获取微信自定义错误
 */
 function getWechatCustomError(res){
-  var error = new Object()
-  error.errMsg = res.errMsg
-  error.errCode = res.errCode
+  var code = res.errCode
+  var errMsg = res.errMsg
+  var error = preModel.initError(code, errMsg)
+  return error
 }
 
 /*
@@ -1443,8 +1396,107 @@ function checkCRC16WithData(data, crc){
 
 /* - 命令函数 - */
 
+/*
+* 连接低功耗蓝牙设备
+*/
+
+function createBLEConnection(obj) {
+  wx.createBLEConnection({
+    deviceId: obj.deviceId,
+    success: function (res) {
+      connectedDeviceId = obj.deviceId
+      connectedDevice = preModel.initDevice()
+      connectedDevice.deviceId = connectedDeviceId
+      connectedDevice.connected = true
+
+      //获取所有特征服务
+      getAllServices()
+      if (obj.success) {
+        obj.success(res);
+      }
+    },
+    fail: function (res) {
+      if (obj.fail) {
+        obj.fail(res)
+      }
+    },
+    complete: function (res) {
+      if (obj.complete) {
+        obj.complete(res)
+      }
+    }
+  })
+}
 
 
+/*
+* 断开与低功耗蓝牙设备的连接
+*/
+
+function closeBLEConnection(obj) {
+  wx.closeBLEConnection({
+    deviceId: obj.deviceId,
+    success: function (res) {
+      if (obj.success) {
+        obj.success(res);
+      }
+    },
+    fail: function (res) {
+      if (obj.fail) {
+        obj.fail(res)
+      }
+    },
+    complete: function (res) {
+      if (obj.complete) {
+        obj.complete(res)
+      }
+    }
+
+  })
+}
+
+
+/*
+* connect Device
+*/
+
+function connectPeripheral(deviceId,callBack){
+  createBLEConnection({
+    deviceId: deviceId,
+    success: function (res) {
+      if(callBack){
+        callBack(connectedDevice,null,null)
+      }
+    },
+    fail: function (res) {
+      var error = getWechatCustomError(res)
+      if(callBack){
+        callBack(connectedDevice,error,null)
+      }
+    }
+  })
+}
+
+/*
+* 断开连接
+*/
+
+function cancelPeripheralConnection(deviceId, callBack){
+  closeBLEConnection({
+    deviceId: deviceId,
+    success: function (res) {
+      if (callBack) {
+        callBack(connectedDevice, null, null)
+      }
+    },
+    fail: function (res) {
+      var error = getWechatCustomError(res)
+      if (callBack) {
+        callBack(connectedDevice, error, null)
+      }
+    }
+  })
+}
 
 /*
 * Bind 
@@ -1481,8 +1533,6 @@ function bindDeviceWithIdentifier(identifier,callBack){
           getDeviceFunstions(null)
 
         }
-        
-
       }
       if(callBack){
         callBack(device,error,result)
@@ -1568,6 +1618,8 @@ function loginDeviceWithIdentifier(identifier,callBack){
   })
 
 }
+
+
 
 /*
 * Get Functions
@@ -1786,6 +1838,8 @@ function haveResDataWithCmd(cmd,key){
 
 // 对外可见模块
 module.exports = {
+  connectedDevice: connectedDevice,
+  Singleton: Singleton,
   initialBTManager: initialBTManager,
   openBluetoothAdapter : openBluetoothAdapter,
   closeBluetoothAdapter: closeBluetoothAdapter,
@@ -1797,6 +1851,8 @@ module.exports = {
   getConnectedBluetoothDevices: getConnectedBluetoothDevices,
   createBLEConnection: createBLEConnection,
   closeBLEConnection: closeBLEConnection,
+  connectPeripheral: connectPeripheral,
+  cancelPeripheralConnection: cancelPeripheralConnection,
   getBLEDeviceServices: getBLEDeviceServices,
   getBLEDeviceCharacteristics: getBLEDeviceCharacteristics,
   readBLECharacteristicValue: readBLECharacteristicValue,

@@ -25,7 +25,19 @@ Page({
     })
 
     // 连接
-    realTekBTManager.createBLEConnection({
+    realTekBTManager.connectPeripheral(deviceId,function (device, error, result){
+      wx.hideLoading()
+      if(error){
+        wx.showToast({
+          title: res.errMsg,
+        })
+      }else{
+        wx.navigateTo({
+          url: '../deviceFunctions/deviceFunctions?deviceId=' + deviceId,
+        })
+      }
+    })
+    /*realTekBTManager.createBLEConnection({
       deviceId: deviceId,
       success: function(res){
         console.log("connected success 111")
@@ -42,7 +54,7 @@ Page({
       complete: function(res){
         wx.hideLoading()
       }
-    })
+    })*/
   },
    
   
@@ -160,8 +172,12 @@ Page({
    * 生命周期函数--监听页面显示
    */
   onShow: function () {
-    console.log("page onShow")
+    
 
+    realTekBTManager.Singleton ++
+    console.log("device page onShow:", realTekBTManager.Singleton)
+
+   
     let that = this
     realTekBTManager.openBluetoothAdapter({
       success: function (res) {

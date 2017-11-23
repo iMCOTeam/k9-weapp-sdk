@@ -1,5 +1,9 @@
 let DF_RealTek_Date_Cut_Year = 2000 //年份默认以2000年开始计算所以传输需要减去2000
 
+let CALLBACK = function(device, error, result){
+
+}
+
 /* - 自定义错误码 - */
 let ZH_RealTek_Error_Code = {
   ZHCharactiristicNotFindCode: 100001,
@@ -142,11 +146,17 @@ let ZH_RealTek_ScreenOrientation = {
 }
 
 
+function initError(code,errMsg){
+  var error = new Object()
+  error.code = code
+  error.errMsg = errMsg
+  return error
+}
 
 function initDevice(){
   var device = new Object()
   device.name = null
-  device.identifier = null
+  device.deviceId = null
   device.rssi = null
   device.connected = false
   device.bound = false
@@ -255,6 +265,7 @@ module.exports = {
   ZH_RealTek_Sport_Mode: ZH_RealTek_Sport_Mode,
   ZH_RealTek_Sleep_Mode: ZH_RealTek_Sleep_Mode,
   ZH_RealTek_ScreenOrientation: ZH_RealTek_ScreenOrientation,
+  initError: initError,
   initDevice: initDevice,
   initAlarm: initAlarm,
   initLongSit: initLongSit,
