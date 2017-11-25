@@ -42,24 +42,7 @@ Page({
         })
       }
     })
-    /*realTekBTManager.createBLEConnection({
-      deviceId: deviceId,
-      success: function(res){
-        console.log("connected success 111")
-        wx.navigateTo({
-          url: '../deviceFunctions/deviceFunctions?deviceId='+deviceId,
-        })
-
-      },
-      fail: function(res){
-        wx.showToast({
-          title: res.errMsg,
-        })
-      },
-      complete: function(res){
-        wx.hideLoading()
-      }
-    })*/
+    
   },
    
   

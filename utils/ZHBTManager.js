@@ -30,9 +30,16 @@ var macAddressCharObj = null //固件蓝牙地址特征
 var OTApatchVersion = 0 //OTA Patch version
 var OTAappVersion = 0 //OTA App version
 var macAddress = null //OTA macAddress
-
-
 var functionsHaveUpdated = null
+var bleConnectionStateChange = function(device,error){
+  
+
+}
+
+var bluetoothAdapterStateChange = function (available){
+
+}
+
 
 // 大小端模式判定
 var littleEndian = (function () {
@@ -69,10 +76,15 @@ function initialBTManager(obj){
     }else{
       discovering = true
     }
+    if(centralStateUpdateCallBack){
+      centralStateUpdateCallBack(res.available)
+    }
+
     if (!res.available){
       console.log("bluetooth adapter is not valid")
       bluetoolthavailable = false
       clearCaches()
+      
     }else{
       bluetoolthavailable = true
       console.log("bluetooth adapter is valid")
@@ -81,6 +93,9 @@ function initialBTManager(obj){
 
   // 监听低功耗蓝牙连接的错误事件，包括设备丢失，连接异常断开等等。
   onBLEConnectionStateChange(function (res){
+    if(bleConnectionStateChange){
+      bleConnectionStateChange(res.connected)
+    }
     if (!res.connected){
       console.log("bluetooth have disconnected with deviceId:", res.deviceId)
       clearCaches()
@@ -99,7 +114,6 @@ function clearCaches()
 {
   discovering = false  
   characteristicValueWrtieBlocks = []
-  bluetoolthavailable = false
   connectedDeviceId = null
   connectedDevice = null
   receiveData = null 
@@ -1633,6 +1647,179 @@ function loginDeviceWithIdentifier(identifier,callBack){
 }
 
 
+/*
+*Find My Band Device
+*/
+function findMyBandDeviceonFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  if(immediateCharObj){
+    var buffer = new ArrayBuffer(1)
+    var data = new Uint8Array(buffer)
+    data[0] = 1
+    
+    writeBLECharacteristicValue({
+      deviceId: connectedDeviceId,
+      serviceId: common.RealTek_ServiceUUIDs.RealTek_Immediate_Remind_ServiceUUID,
+      characteristicId: immediateCharObj.uuid,
+      value: buffer,
+      success: function(res){
+        if(callBack){
+          callBack(connectedDevice,null,null)
+        }
+
+      },
+      fail: function(res){
+        if(callBack){
+          var error = getWechatCustomError(res);
+          callBack(connectedDevice,error,null)
+        }
+
+      }
+
+    })
+  }
+}
+
+/*
+* Alarm
+*/
+
+function synAlarms(alarms, callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var value = null
+  var avalidAlarms = 0
+  if(alarms && alarms.length > 0){
+    var alarmLength = cmdPreDef.DF_RealTek_Header_Predef.DF_RealTek_AlarmValue_Length
+    for(var index = 0; index < alarms.length; index++){
+      var alarm = alarms[index]
+      if (alarm.enable){
+        avalidAlarms ++
+        var alarmByte = getAlarmValue(alarm)
+        if(!value){
+          value = alarmByte
+        }else{
+          value = appendBuffer(value,alarmByte)
+        }
+      }
+    }
+    var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+    var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_Alarm
+    var seqId = getSeqIDWithCommand(cmd, key)
+    var keyValue = value
+    var keyValueLength = avalidAlarms * alarmLength
+    var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+    
+    sendDataToBandDevice({
+      data: packet,
+      ackBool: false,
+      callBack: callBack 
+    })
+
+  }
+}
+
+function getBandAlarmsonFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Get_AlarmList_Req
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValue = null
+  var keyValueLength = 0
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+}
+
+
+function getAlarmValue(alarm){
+  var cutYear = preModel.DF_RealTek_Date_Cut_Year
+  if(alarm.year > cutYear){
+    alarm.year = alarm.year - cutYear
+  }
+  var year = alarm.year;
+  var month = alarm.month;
+  var day = alarm.day;
+  var hour = alarm.hour;
+  var minute = alarm.minute;
+  var alarmId = alarm.index;
+  var dayflags = alarm.dayFlags;
+  var alarmLength = cmdPreDef.DF_RealTek_Header_Predef.DF_RealTek_AlarmValue_Length
+  var alarmBytes = new Uint8Array(alarmLength)
+  alarmBytes[0] = (year << 2) + ((month & 0xc) >> 2);
+  alarmBytes[1] = ((month & 0x3) << 6) + ((day & 0x1f) << 1) + ((hour & 0x10) >> 4);
+  alarmBytes[2] = ((hour & 0xf) << 4) + ((minute & 0x3c) >> 2);
+  alarmBytes[3] = ((minute & 0x3) << 6) + (alarmId << 3);
+  alarmBytes[4] = dayflags;
+  return alarmBytes.buffer;
+
+}
+
+/*
+* Syn Time
+*/
+
+function synTimeonFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var date = new Date()
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_Time
+  var seqId = getSeqIDWithCommand(cmd, key)
+  
+  var keyValue = getDateValue(date)
+  var keyValueLength = 4
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
+
+function getDateValue(date){
+  var cutYear = preModel.DF_RealTek_Date_Cut_Year
+  
+  var year = date.getFullYear()
+  var month = date.getMonth() + 1
+  var day = date.getDate()
+  var hour = date.getHours()
+  var minute = date.getMinutes()
+  var second = date.getSeconds()
+  year = year - cutYear
+  
+  day = 25
+  hour = 18
+  minute = 9
+  second = 20
+  
+  var value = (year << 26) + (month << 22) + (day << 17) + (hour << 12) + (minute << 6) + second
+
+  var info = "day: " + day + "hour: " + hour + "minute:" + minute + "value:" + value
+  console.log(info)
+  var buffer = new ArrayBuffer(4)
+  var dataView = new DataView(buffer)
+  dataView.setUint32(0,value,false)
+  return buffer
+
+}
+
 
 /*
 * Get Functions
@@ -1881,7 +2068,12 @@ module.exports = {
   getL2Payload: getL2Payload,
   bindDeviceWithIdentifier: bindDeviceWithIdentifier,
   unBindDeviceonFinished: unBindDeviceonFinished,
-  loginDeviceWithIdentifier: loginDeviceWithIdentifier
-
+  loginDeviceWithIdentifier: loginDeviceWithIdentifier,
+  findMyBandDeviceonFinished: findMyBandDeviceonFinished,
+  bleConnectionStateChange: bleConnectionStateChange,
+  bluetoothAdapterStateChange: bluetoothAdapterStateChange,
+  synAlarms: synAlarms,
+  getBandAlarmsonFinished: getBandAlarmsonFinished,
+  synTimeonFinished: synTimeonFinished
   
 }

@@ -178,7 +178,7 @@ function initAlarm(){
   var day = date.getDay()
   var hour = date.getHours()
   var minute = date.getMinutes
-
+  alarm.enable = false
   alarm.year = year - DF_RealTek_Date_Cut_Year
   alarm.month = month
   alarm.day = day
