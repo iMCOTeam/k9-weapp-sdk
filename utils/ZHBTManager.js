@@ -76,8 +76,8 @@ function initialBTManager(obj){
     }else{
       discovering = true
     }
-    if(centralStateUpdateCallBack){
-      centralStateUpdateCallBack(res.available)
+    if (bluetoothAdapterStateChange){
+      bluetoothAdapterStateChange(res.available)
     }
 
     if (!res.available){
@@ -439,7 +439,6 @@ tips: 并行调用多次读写接口存在读写失败的可能性
 */
 
 function writeBLECharacteristicValue(obj){
-  common.printLogWithBuffer(obj.value, "writeBLECharacteristicValue")
   wx.writeBLECharacteristicValue({
     deviceId: obj.deviceId,
     serviceId: obj.serviceId,
@@ -670,8 +669,8 @@ function handleReceivedData(value){
     return
   }
 
-  //这里假设每个包都含有L1Header+L2Header 所以组合时后面的包需要去掉Header
-  if (!receiveData) {// First Receive Data
+  //这里假设每个包都含有L1Header+L2Header 带扩展
+  /*if (!receiveData) {// First Receive Data
     receivePayloadLength = l1PayloadLength
     receiveData = value
     var resInfo = "First Receive Packet"
@@ -688,17 +687,19 @@ function handleReceivedData(value){
       }
 
     }
-  }
+  }*/
 
+  receivePayloadLength = l1PayloadLength
+  receiveData = value
   if (receiveData.byteLength == (receivePayloadLength + l1HeaderSize)) {//已经接收完数据
     var info = "Receive all Packet"
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
-    
     parseReceivedData(receiveData)
 
   }else{
     var info = "Receive Packet is not finished:" +  receiveData.byteLength + receivePayloadLength
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+    clearReceiveDataCaches()
   }
 
 }
@@ -883,12 +884,24 @@ function getAlarmsWithValue(value){
   common.printLogWithBuffer(value,"alarms")
   var arlarmValueLength = cmdPreDef.DF_RealTek_Header_Predef.DF_RealTek_AlarmValue_Length
   var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
+  var valueByteLength = value.byteLength
+  if (valueByteLength < l2PayloadHeaderSize){
+    var info = "Warn AlarmValue byteLength less than l2PayloadHeaderSize"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
+    return;
+
+  }
 
   var valueLengthPreBuffer = new DataView(value,1, 1)
   var valueLengthLateBuffer = new DataView(value,2,1)
   var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
-  
+  if(valueByteLength < (l2PayloadHeaderSize + valueLength)){
+    var info = "Warn Alarms Value byteLength less than ValueLength"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
+    return;
+  }
   var alarmsNum = valueLength/arlarmValueLength
+  console.log("alarms number:",alarmsNum)
   if(alarmsNum > 3){
     var info = "Warn Alarms count more than 3"
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
@@ -896,31 +909,40 @@ function getAlarmsWithValue(value){
   }
   var alarms = new Array()
   var alarmValue = value.slice(l2PayloadHeaderSize)
+  common.printLogWithBuffer(alarmValue,"alarm value data:")
   for(var index = 0; index < alarmsNum; index++){
-    var year = (new DataView(alarmValue, index * arlarmValueLength, 1).getUint8(0) & 0xfc) >> 2
-    var month = ((new DataView(alarmValue, index * arlarmValueLength, 1).getUint8(0) & 0x3) << 2) + ((new DataView(alarmValue, index * arlarmValueLength + 1, 1).getUint8(0) & 0xc0) >> 6)
-    var day = (new DataView(alarmValue, index * arlarmValueLength+1, 1).getUint8(0) & 0x3f) >> 1
-    var hour = ((new DataView(alarmValue, index * arlarmValueLength + 1, 1).getUint8(0) & 0x1) << 4) + ((new DataView(alarmValue, index * arlarmValueLength + 2, 1).getUint8(0) & 0xf0) >> 4)
-    var minute = ((new DataView(alarmValue, index * arlarmValueLength + 2, 1).getUint8(0) & 0x0f) << 2) + ((new DataView(alarmValue, index * arlarmValueLength + 3, 1).getUint8(0) & 0xc0) >> 6)
+    if (alarmValue.byteLength >= (index * arlarmValueLength + 4)){
+      var year = (new DataView(alarmValue, index * arlarmValueLength, 1).getUint8(0) & 0xfc) >> 2
+      var month = ((new DataView(alarmValue, index * arlarmValueLength, 1).getUint8(0) & 0x3) << 2) + ((new DataView(alarmValue, index * arlarmValueLength + 1, 1).getUint8(0) & 0xc0) >> 6)
+      var day = (new DataView(alarmValue, index * arlarmValueLength + 1, 1).getUint8(0) & 0x3f) >> 1
+      var hour = ((new DataView(alarmValue, index * arlarmValueLength + 1, 1).getUint8(0) & 0x1) << 4) + ((new DataView(alarmValue, index * arlarmValueLength + 2, 1).getUint8(0) & 0xf0) >> 4)
+      var minute = ((new DataView(alarmValue, index * arlarmValueLength + 2, 1).getUint8(0) & 0x0f) << 2) + ((new DataView(alarmValue, index * arlarmValueLength + 3, 1).getUint8(0) & 0xc0) >> 6)
 
-    var index = (new DataView(alarmValue, index * arlarmValueLength + 3, 1).getUint8(0) & 0x38) >> 3
-    var dayFlags = new DataView(alarmValue, index * arlarmValueLength + 4, 1).getUint8(0) & 0x7f
-    year = year + preModel.DF_RealTek_Date_Cut_Year
+      var index = (new DataView(alarmValue, index * arlarmValueLength + 3, 1).getUint8(0) & 0x38) >> 3
+      var dayFlags = new DataView(alarmValue, index * arlarmValueLength + 4, 1).getUint8(0) & 0x7f
+      year = year + preModel.DF_RealTek_Date_Cut_Year
 
 
-    var alarm = preModel.initAlarm()
-    alarm.year = year
-    alarm.month = month
-    alarm.day = day
-    alarm.hour = hour
-    alarm.minute = minute
-    alarm.index = index
-    alarm.dayFlags = dayFlags
-    alarms[index] = alarm
+      var alarm = preModel.initAlarm()
+      alarm.year = year
+      alarm.month = month
+      alarm.day = day
+      alarm.hour = hour
+      alarm.minute = minute
+      alarm.index = index
+      alarm.dayFlags = dayFlags
+      alarms[index] = alarm
+
+      var info = "alarm year:" + year + " month:" + month + " day:" + day + " hour" + hour + " minute" + minute + " index:" + index + " dayFlags:" + dayFlags
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+
+
+    }else{
+      var info = "alarmValue length: " + alarmValue.byteLength
+      console.log(info)
+
+    }
     
-    var info = "alarm year:" + year + " month:" + month + " day:" + day + " hour" + hour + " minute" + minute + " index:" + index + " dayFlags:" + dayFlags
-    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
-
   }
 
   return alarms
@@ -1176,36 +1198,19 @@ function getL1HeaderWithAckFlagBool(ackBool, errorBool, L1Payload, L1PayloadLeng
     var payloadView = new DataView(buffer,2,2)
     var crcView = new DataView(buffer,4,2)
     var seqView = new DataView(buffer,6,2)
-
-
-    //l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Magic_Pos] = magic
-    //l1Header[l1HeaderOrder.DF_RealTek_L1_Header_Protocol_Version_Pos] = ackVersion
     view8[0] = magic
     view8[1] = ackVersion
     payloadView.setInt16(0,L1PayloadLength,false)
-    
-    // l1Header[1] = ackVersion
-    // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_HighByte_Pos] = (L1PayloadLength >> 8) & 0xFF
-    // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_PayloadLength_LowByte_Pos] = L1PayloadLength & 0xFF
-
+   
     if((L1PayloadLength > 0) && L1Payload){
       var L1PayloadArray = new Uint8Array(L1Payload)
       var crc16 = common.getCRC16WithValue(L1PayloadArray)
       crcView.setInt16(0,crc16,false)
 
-    
-      //l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_HighByte_Pos] = (crc16 >> 8) & 0xFF
-      //l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_LowByte_Pos] = crc16 & 0xFF
-
     }else{
-      // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_HighByte_Pos] = 0
-      // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_CRC16_LowByte_Pos] = 0
       crcView.setInt16(0,0,false)
     }
 
-
-    // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_SeqID_HighByte_Pos] = (sequenceId >> 8) & 0xFF
-    // l1Header[l1HeaderOrder.DF_RealTek_L1_Header_SeqID_LowByte_Pos] = sequenceId & 0xFF
     seqView.setInt16(0,sequenceId,false)
 
   }
@@ -1540,10 +1545,7 @@ function bindDeviceWithIdentifier(identifier,callBack){
     dataBuffer = dataBuffer.slice(0,maxLength)
   }
 
-  var bindByte = new Uint8Array(maxLength)
-  bindByte.set(dataBuffer,0)
-
-  var keyValue = bindByte;
+  var keyValue = dataBuffer;
   var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Bind
   var key = cmdPreDef.ZH_RealTek_Bind_Key.RealTek_Key_Bind_Req
   var seqId = getSeqIDWithCommand(cmd,key)
@@ -1610,7 +1612,6 @@ function loginDeviceWithIdentifier(identifier,callBack){
   if (!connected) {
     return
   }
-  console.log("call loginDeviceWithIdentifier:",identifier)
   var dataBuffer = getBufferWithString(identifier)
   var maxLength = cmdPreDef.DF_RealTek_Header_Predef.DF_RealTek_Max_BoundIdntifier_Length
   if (dataBuffer.byteLength > maxLength) {
@@ -1714,6 +1715,8 @@ function synAlarms(alarms, callBack){
     var keyValue = value
     var keyValueLength = avalidAlarms * alarmLength
     var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+    common.printLogWithBuffer(value,"Alarms Value")
     
     sendDataToBandDevice({
       data: packet,
@@ -1793,9 +1796,9 @@ function synTimeonFinished(callBack){
 
 }
 
-function getDateValue(date){
+function getDateValue(date) {
   var cutYear = preModel.DF_RealTek_Date_Cut_Year
-  
+
   var year = date.getFullYear()
   var month = date.getMonth() + 1
   var day = date.getDate()
@@ -1803,23 +1806,206 @@ function getDateValue(date){
   var minute = date.getMinutes()
   var second = date.getSeconds()
   year = year - cutYear
-  
-  day = 25
-  hour = 18
-  minute = 9
-  second = 20
-  
+
   var value = (year << 26) + (month << 22) + (day << 17) + (hour << 12) + (minute << 6) + second
 
-  var info = "day: " + day + "hour: " + hour + "minute:" + minute + "value:" + value
-  console.log(info)
   var buffer = new ArrayBuffer(4)
   var dataView = new DataView(buffer)
-  dataView.setUint32(0,value,false)
+  dataView.setUint32(0, value, false)
   return buffer
 
 }
 
+/*
+* Set Step Target
+*/
+
+function setStepTarget(step, callBack) {
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  
+  var buffer = new ArrayBuffer(4)
+  var dataView = new DataView(buffer)
+  dataView.setUint32(0,step,false)
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_StepTarget
+  var seqId = getSeqIDWithCommand(cmd, key)
+
+  var keyValue = buffer
+  var keyValueLength = 4
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
+
+
+/*
+*Set User Profile
+*/
+
+function setUserProfileWithGender(gender, age, height,weight,callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+
+  var temGender = 0
+  if (gender == preModel.ZH_RealTek_Gender.ZH_RealTek_Female){
+    temGender = 1
+  }
+  var temAge = age
+  var temHeight = (height + 0.5) * 2 //因为手环端以0.5cm为单位所以得乘以2
+  var temWeight = (weight + 0.5) * 2 //因为手环端以0.5kg所以得乘以2
+
+  var userProfile = (temGender << 31) + (temAge << 24) + (temHeight << 15) + (temWeight << 5) + (0 & 0x1f);
+
+  var buffer = new ArrayBuffer(4)
+  var dataView = new DataView(buffer)
+  dataView.setUint32(0, userProfile, false)
+
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_UserProfile
+  var seqId = getSeqIDWithCommand(cmd, key)
+
+  var keyValue = buffer
+  var keyValueLength = 4
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
+
+
+/*
+* set longsit remind
+*/
+function setLongSitRemind(sit,callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  
+  var reserved = 0
+  var onEnable = 0x00
+  if (sit.enable){
+    onEnable = 0x01
+  }
+  var minStep = sit.minStepNum
+  var sitTime = sit.sitTime
+  var beginTime = sit.beginTime
+  var endTime = sit.endTime
+  var dayFlags = sit.dayFlags;
+  
+  var buffer = new ArrayBuffer(8)
+  var reverVedView = new DataView(buffer,0,1)
+  var enAbleView = new DataView(buffer,1,1)
+  var minStepView = new DataView(buffer,2,2)
+  var sitTimeView = new DataView(buffer,4,1)
+  var beginTimeView = new DataView(buffer,5,1)
+  var endTimeView = new DataView(buffer,6,1)
+  var dayFlagsView = new DataView(buffer,7,1)
+
+  reverVedView.setUint8(0,0)
+  enAbleView.setUint8(0,onEnable)
+  minStepView.setUint16(0,minStep,false)
+  sitTimeView.setUint8(0,sitTime)
+  beginTimeView.setUint8(0,beginTime)
+  endTimeView.setUint8(0,endTime)
+  dayFlagsView.setUint8(dayFlags)
+  
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_Sit_Long_OnOff
+  var seqId = getSeqIDWithCommand(cmd, key)
+
+  var keyValue = buffer
+  var keyValueLength = 8
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
+
+
+/*
+* get longsit remind
+*/
+function getLongSitRemindonFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Get_Sit_Long_Req
+  var seqId = getSeqIDWithCommand(cmd, key)
+
+  var keyValue = null
+  var keyValueLength = 0
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
+
+
+/*
+*set Moblie OS
+*/
+function setMoblieOS(os,callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+
+  var OSIdentifier = 0x02
+  var reserve = 0
+  if (os == preModel.ZH_RealTek_OS.ZH_RealTek_OS_Android){
+    OSIdentifier = 0x01
+  }
+
+  var valueBuffer = new Uint8Array(2)
+  valueBuffer[0] = OSIdentifier
+  valueBuffer[1] = reserve
+  var buffer = valueBuffer.buffer
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_PhoneOS
+  var seqId = getSeqIDWithCommand(cmd, key)
+
+  var keyValue = buffer
+  var keyValueLength = 2
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+
+
+}
 
 /*
 * Get Functions
@@ -1858,9 +2044,9 @@ function sendDataToBandDevice(obj){
       common.printDebugInfo(keyInfo, common.ZH_Log_Level.ZH_Log_Info)
       characteristicValueWrtieBlocks[key] = callBack
     }else if (ackBool){
-      common.printLogWithBuffer(data, "Send ack")
+      common.printLogWithBuffer(data, "Send ack ")
     }else {
-      common.printLogWithBuffer(data, "Send Packet")
+      common.printLogWithBuffer(data, "Send Packet ")
     }
     
     writeBLECharacteristicValue({
@@ -1931,7 +2117,7 @@ function replaceReskey(key,cmd){
       case Setting_Keys.RealTek_Key_Get_TurnLight_Rep:
         return Setting_Keys.RealTek_Key_Get_TurnLight_Req
       case Setting_Keys.RealTek_Key_Get_ALarmList_Rep:
-        return Setting_Keys.RealTek_Key_Get_ALarmList_Rep
+        return Setting_Keys.RealTek_Key_Get_AlarmList_Req
       case Setting_Keys.RealTek_Key_Get_Sit_Long_Rep:
         return Setting_Keys.RealTek_Key_Get_Sit_Long_Req
       case Setting_Keys.RealTek_Key_Get_ScreenOrientationRep:
@@ -2074,6 +2260,11 @@ module.exports = {
   bluetoothAdapterStateChange: bluetoothAdapterStateChange,
   synAlarms: synAlarms,
   getBandAlarmsonFinished: getBandAlarmsonFinished,
-  synTimeonFinished: synTimeonFinished
+  synTimeonFinished: synTimeonFinished,
+  setStepTarget: setStepTarget,
+  setUserProfileWithGender: setUserProfileWithGender,
+  setLongSitRemind: setLongSitRemind,
+  getLongSitRemindonFinished: getLongSitRemindonFinished,
+  setMoblieOS: setMoblieOS
   
 }

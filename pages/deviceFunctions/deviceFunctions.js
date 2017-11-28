@@ -3,8 +3,6 @@ const manager = require("../../utils/ZHBTManager.js")
 let preModel = require("../../utils/ZHBTModel.js")
 
 Page({
-
-  
   /**
    * 页面的初始数据
    */
@@ -91,7 +89,7 @@ Page({
     var functionMode = event.target.dataset.functionmode
     console.log("click functionMode", functionMode)
     var Function_Keys = util.ZHFunctionMode
-    var identifier = "a_test_user"
+    var identifier = "atestuser"
     switch(functionMode){
       case (Function_Keys.ZHLogin):{
         that.loginWithIdentifier(identifier)
@@ -129,11 +127,197 @@ Page({
 
       }
         break;
+      case (Function_Keys.ZHGetAlarms):{
+        that.getAlarms()
+
+      }
+      break
+
+      case (Function_Keys.ZHSetStepTarget):{
+        that.setStepTarget()
+
+      }
+      break
+
+      case (Function_Keys.ZHSynUserProfile):{
+        that.setUserProfile()
+
+      }
+      break
+    
+      case (Function_Keys.ZHSetSittingReminder):{
+        that.setLongSit()
+
+      }
+      break;
+      
+      case (Function_Keys.ZHGetSittingReminder):{
+        that.getLongSitRemind()
+
+      }
+      break;
+      
+      case (Function_Keys.ZHSetMobileSystem):{
+        that.setOS()
+
+      }
+      break;
       
     }
   },
 
   /* - Functions - */
+
+
+  /*
+  * Set OS
+  */
+  setOS: function(){
+    var os = preModel.ZH_RealTek_OS.ZH_RealTek_OS_iOS
+    wx.showLoading({
+      title: 'Set OS...',
+    })
+    manager.setMoblieOS(function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "Set OS Success...",
+        })
+
+      }
+    })
+
+  },
+
+  /*
+  * get long sit reminder enable
+  */
+
+  getLongSitRemind: function(){
+    wx.showLoading({
+      title: 'get LongSit reminder enable...',
+    })
+    manager.getLongSitRemindonFinished(function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        if(result == null){
+          var info = "Get Long Sit Failed"
+          wx.showToast({
+            title: info,
+          })
+          return;
+        }
+        if(result){
+          var info = "Long Sit is On"
+          wx.showToast({
+            title: info,
+          })
+
+        }else{
+          var info = "Long Sit is Off"
+          wx.showToast({
+            title: info,
+          })
+        }
+        
+
+      }
+    })
+
+  },
+
+  /*
+  * set longsit reminder
+  */
+  setLongSit: function(){
+    var sit = preModel.initLongSit()
+    sit.enable = true
+    sit.sitTime = 5 //久坐时间 min
+
+    wx.showLoading({
+      title: 'Set LongSit...',
+    })
+    manager.setLongSitRemind(sit, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "Set LongSit Success...",
+        })
+
+      }
+    })
+
+
+
+  },
+
+
+  /*
+  * set User profile
+  */
+  setUserProfile: function(){
+    var gender = preModel.ZH_RealTek_Gender.ZH_RealTek_Male
+    var age = 20 
+    var height = 170 //cm
+    var weight = 50 //kg
+
+    wx.showLoading({
+      title: 'Set User Profile...',
+    })
+    manager.setUserProfileWithGender(gender, age, height, weight, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "Set User Profile Success...",
+        })
+
+      }
+    })
+
+  },
+
+
+
+  /* 
+  *set step target
+  */
+
+  setStepTarget: function(){
+    wx.showLoading({
+      title: 'Set step target...',
+    })
+    var stepTarget = 100
+    manager.setStepTarget(stepTarget, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "Set step target Success...",
+        })
+
+      }
+    })
+
+  },
 
   /*
   * set Alarms
@@ -165,9 +349,9 @@ Page({
     var date = new Date()
     var year = date.getFullYear()
     var month = date.getMonth() + 1
-    var day = date.getDay()
-    var hour = date.getHours()
-    var minute = date.getMinutes()
+    var day = date.getDate()
+    var hour = date.getHours() 
+    var minute = date.getMinutes() 
 
     var alarm1 = preModel.initAlarm()
     alarm1.year = year;
@@ -177,7 +361,7 @@ Page({
     alarm1.minute = minute + 2;
     alarm1.index = 0;
     alarm1.dayFlags = 0;
-    alarm1.enable = false;
+    alarm1.enable = true;
 
     var alarm2 = preModel.initAlarm()
     alarm2.year = year;
@@ -204,6 +388,31 @@ Page({
    return[alarm1,alarm2,alarm3]
   },
 
+  /*
+  * Get Alarms
+  */
+
+  getAlarms: function(){
+    wx.showLoading({
+      title: 'Get Alarms...',
+    })
+
+    manager.getBandAlarmsonFinished(function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var info = "Get Alarm Success,Alarms Count:" + result.length
+        wx.showToast({
+          title: info,
+        })
+      }
+
+    })
+
+  },
 
   /* 
   *  Syn Time
@@ -229,6 +438,7 @@ Page({
     })
 
   },
+
 
 
   /*
