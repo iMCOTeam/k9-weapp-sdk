@@ -15,6 +15,8 @@ App({
     realTekBTManager.initialBTManager();
 
     
+
+    
     // 登录
     wx.login({
       success: res => {

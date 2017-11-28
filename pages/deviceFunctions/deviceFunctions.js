@@ -80,6 +80,11 @@ Page({
      functionModel.cellMode = cellMode
      functionModel.functionMode = functionMode
      functionModel.title = title
+     functionModel.haveSwitch = false
+     if (cellMode == util.ZHFunctionCellMode.ZHTitleAndSwitch){
+       functionModel.haveSwitch = true
+
+     }
      return functionModel
   },
 
@@ -112,10 +117,48 @@ Page({
     }
   },
 
-  clickSetCmd: function(event){
+  switchChange: function(event){
     var that = this
     var functionMode = event.target.dataset.functionmode
+    var enable = event.detail.value
+    console.log('switch 发生 change 事件，携带值为', enable)
+    var info = "click switch functionMode" + functionMode
+   
+    if(enable){
+      info = info + " On"
+    }else{
+      info = info + " off"
+    }
+    console.log(info)
+
+    var Function_Keys = util.ZHFunctionMode
+    switch(functionMode){
+      case (Function_Keys.ZHSetSittingReminder): {
+        that.setLongSit(enable)
+
+      }
+        break;
+      case (Function_Keys.ZHSetRaiseHandLight):{
+        that.turnWirstLight(enable)
+      }
+      break;
+    }
+    
+
+  },
+
+  clickSetCmd: function(event){
+    var that = this
+    var haveSwitch = event.target.dataset.haveswitch
+    var functionMode = event.target.dataset.functionmode
     console.log("click functionMode", functionMode)
+    if(haveSwitch){
+      console.log("click functionMode haveSwitch")
+      return;
+    }else{
+      console.log("click functionMode not haveSwitch")
+    }
+    
     var Function_Keys = util.ZHFunctionMode
     switch (functionMode) {
       case (Function_Keys.ZHSynTime): {
@@ -145,12 +188,6 @@ Page({
       }
       break
     
-      case (Function_Keys.ZHSetSittingReminder):{
-        that.setLongSit()
-
-      }
-      break;
-      
       case (Function_Keys.ZHGetSittingReminder):{
         that.getLongSitRemind()
 
@@ -162,11 +199,143 @@ Page({
 
       }
       break;
+
+      case (Function_Keys.ZHEnterPhotoMode):{
+        that.enterCameraMode()
+
+      }
+      break;
+    
+      case (Function_Keys.ZHExitPhotoMode):{
+        that.quitCameraMode()
+      }
+      break;
+
+      case (Function_Keys.ZHGetRaiseHandLightSet):{
+        that.getTurnWristLight()
+ 
+      }
+      break;
+
       
     }
   },
 
   /* - Functions - */
+
+  /*
+  * 设置抬手亮屏
+  */
+
+  turnWirstLight: function(enable){
+    wx.showLoading({
+      title: 'set TurnWristLight status...',
+    })
+    manager.setTurnWristLightEnabled(enable, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "set TurnWristLight status Success...",
+        })
+
+      }
+
+    })
+
+  },
+
+  /*
+  * get Turn Wrist Light status
+  */
+  getTurnWristLight: function(){
+    wx.showLoading({
+      title: 'get TurnWristLight status...',
+    })
+
+    manager.getTurnWristLightEnabledOnFinished(function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var onOrOff = result ? "On": "Off";
+        var info = "Turn Wrist is" + onOrOff
+
+        wx.showToast({
+          title: info,
+        })
+
+      }
+    })
+
+  },
+
+  /*
+  * quit Camera Mode
+  */
+
+  quitCameraMode: function(){
+    wx.showLoading({
+      title: 'quit Camera Mode...',
+    })
+
+
+    manager.setCameraMode(false, function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "quit Camera Mode Success...",
+        })
+
+      }
+
+    }, null)
+
+  },
+
+
+  /*
+  * enter camera mode
+  */
+  enterCameraMode:function(){
+    wx.showLoading({
+      title: 'enter Camera Mode...',
+    })
+
+    var cameraModeUpdateBlock = function (device) {
+
+      var info = 'Receive Camera mode update numers'
+      console.log(info)
+      wx.showToast({
+        title: info,
+      })
+    }
+
+    manager.setCameraMode(true, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "enter Camera Mode Success...",
+        })
+
+      }
+
+    }, cameraModeUpdateBlock)
+
+  },
 
 
   /*
@@ -237,9 +406,9 @@ Page({
   /*
   * set longsit reminder
   */
-  setLongSit: function(){
+  setLongSit: function(enable){
     var sit = preModel.initLongSit()
-    sit.enable = true
+    sit.enable = enable
     sit.sitTime = 5 //久坐时间 min
 
     wx.showLoading({
@@ -558,6 +727,8 @@ Page({
     console.log("options", options.deviceId)
     var bindCmds = this.getBindCommandKeys()
     var setCmds = this.getSetCommandKeys()
+    var num = 0
+    
     this.setData({
       deviceId: options.deviceId,
       bindCommands: bindCmds,

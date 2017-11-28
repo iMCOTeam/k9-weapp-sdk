@@ -12,9 +12,12 @@
   <view wx:if="{{setCommands}}">
     <view class='section_title'>设置命令</view>
     <block wx:for="{{setCommands}}" wx:key="item.functionMode">
-      <view class='section_items' bindtap='clickSetCmd' data-functionmode="{{item.functionMode}}">
+      <view class='section_items' catchtap='clickSetCmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">
         <view class='section_item_title'>
-          <view class='title' catchtap='clickSetCmd' data-functionmode="{{item.functionMode}}">{{item.title}}</view>
+          <view class='title' catchtap='clickSetCmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">{{item.title}}</view>
+        </view>
+        <view class='SwitchView' wx:if="{{item.haveSwitch}}">
+          <switch type="switch" checked="true" bindchange="switchChange" data-functionmode="{{item.functionMode}}"></switch>
         </view>
       </view>
     </block>

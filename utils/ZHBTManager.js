@@ -40,6 +40,8 @@ var bluetoothAdapterStateChange = function (available){
 
 }
 
+var cameraModeUpdateBlock
+
 
 // 大小端模式判定
 var littleEndian = (function () {
@@ -746,6 +748,12 @@ function parseReceivedData(data){
       }
       break;
 
+      case (CMD_IDs.RealTek_CMD_Control):{
+        parseContrlCmdData(l1Payload,blockKey)
+
+      }
+      break;
+
     }
 
   }
@@ -801,6 +809,29 @@ function parseBindCmdData(l1Payload,blockkey){
   }
 
 }
+
+/*
+* Parse Ctrl Cmd Data
+*/
+
+function parseContrlCmdData(l1Payload, blockkey){
+  console.log("call parseContrlCmdData")
+  var key = getL2PayloadKeyWithL1PayLoad(l1Payload)
+  var ctrl_Keys = cmdPreDef.ZH_RealTek_Control_Key
+  switch(key){
+    case ctrl_Keys.RealTek_Key_Ctrol_Photo_Rep:{
+      console.log("RealTek_Key_Ctrol_Photo_Rep")
+      if (cameraModeUpdateBlock){
+        console.log("RealTek_Key_Ctrol_Photo_Rep")
+        cameraModeUpdateBlock(connectedDevice)
+      }
+
+    }
+    break
+
+  }
+}
+
 
 /*
 *  Parse Set Cmd Data
@@ -2002,8 +2033,88 @@ function setMoblieOS(os,callBack){
     callBack: callBack
   })
 
+}
 
 
+/*
+* Camera Mode
+*/
+
+function setCameraMode(enable,callBack,cameraCallBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  cameraModeUpdateBlock = cameraCallBack
+  var value = enable ? 0:1
+  var valueBuffer = new Uint8Array(1)
+  valueBuffer[0] = value
+  var buffer = valueBuffer.buffer
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Control
+  var key = cmdPreDef.ZH_RealTek_Control_Key.RealTek_Key_Control_Camera_Status_Req
+  var seqId = getSeqIDWithCommand(cmd, key)
+
+  var keyValue = buffer
+  var keyValueLength = 1
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+
+}
+
+
+/*
+* 获取抬手亮屏开关状态
+*/
+function getTurnWristLightEnabledOnFinished(callBack){
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Get_TurnLight_Req
+  var seqId = getSeqIDWithCommand(cmd, key)
+
+  var keyValue = null
+  var keyValueLength = 0
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+}
+
+/*
+* 设置抬手亮屏
+*/
+
+function setTurnWristLightEnabled(enable,callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var value = enable ? 1 : 0
+  var valueBuffer = new Uint8Array(1)
+  valueBuffer[0] = value
+  var buffer = valueBuffer.buffer
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_TurnLight_OnOff
+  var seqId = getSeqIDWithCommand(cmd, key)
+
+  var keyValue = buffer
+  var keyValueLength = 1
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
 }
 
 /*
@@ -2042,7 +2153,8 @@ function sendDataToBandDevice(obj){
       var keyInfo = "Save Block key is: " + key
       common.printDebugInfo(keyInfo, common.ZH_Log_Level.ZH_Log_Info)
       characteristicValueWrtieBlocks[key] = callBack
-    }else if (ackBool){
+    }
+    if (ackBool){
       common.printLogWithBuffer(data, "Send ack ")
     }else {
       common.printLogWithBuffer(data, "Send Packet ")
@@ -2145,6 +2257,7 @@ function replaceReskey(key,cmd){
         return SportData_Keys.RealTek_Key_HR_GetContinuousSet
     }
   } else if (cmd == CMD_IDs.RealTek_CMD_Control){
+
 
   }
 
@@ -2267,6 +2380,9 @@ module.exports = {
   setUserProfileWithGender: setUserProfileWithGender,
   setLongSitRemind: setLongSitRemind,
   getLongSitRemindonFinished: getLongSitRemindonFinished,
-  setMoblieOS: setMoblieOS
+  setMoblieOS: setMoblieOS,
+  setCameraMode: setCameraMode,
+  getTurnWristLightEnabledOnFinished: getTurnWristLightEnabledOnFinished,
+  setTurnWristLightEnabled: setTurnWristLightEnabled
   
 }
