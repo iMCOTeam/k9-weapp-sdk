@@ -177,7 +177,7 @@ Page({
     wx.showLoading({
       title: 'Set OS...',
     })
-    manager.setMoblieOS(function (device, error, result){
+    manager.setMoblieOS(os,function (device, error, result){
       wx.hideLoading()
       if (error) {
         wx.showToast({

@@ -1175,7 +1175,6 @@ function getL0PacketWithCommandId(commandId, key, keyValue, keyValueLength, errF
       l1Packet.set(l1Payload, l1HeaderLength)
       
     }
-    common.printLogWithBuffer(l1Packet.buffer, "Send Packet")
     return l1Packet.buffer
 
   }
@@ -2047,6 +2046,9 @@ function sendDataToBandDevice(obj){
       common.printLogWithBuffer(data, "Send ack ")
     }else {
       common.printLogWithBuffer(data, "Send Packet ")
+    }
+    if(!callBack){
+      common.printDebugInfo("Call back is null")
     }
     
     writeBLECharacteristicValue({

@@ -12,7 +12,8 @@ var deBugLog = true
 function printDebugInfo(info,level){
   let that = this;
   if (that.deBugLog){
-    var preString = "iMCODebug*****"
+    var dateString = formatTime(new Date())
+    var preString = dateString +  " iMCODebug*****"
     var remindString = "💧Info"
     switch(level){
       case that.ZH_Log_Level.ZH_Log_Info:
@@ -55,6 +56,22 @@ function printLogWithBuffer(arrayBuffer, label){
   }
 }
 
+
+const formatTime = date => {
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const hour = date.getHours()
+  const minute = date.getMinutes()
+  const second = date.getSeconds()
+
+  return [year, month, day].map(formatNumber).join('/') + ' ' + [hour, minute, second].map(formatNumber).join(':')
+}
+
+const formatNumber = n => {
+  n = n.toString()
+  return n[1] ? n : '0' + n
+}
 
 let ccitt_table = [
   0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
