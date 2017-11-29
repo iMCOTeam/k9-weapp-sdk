@@ -40,8 +40,15 @@ var bluetoothAdapterStateChange = function (available){
 
 }
 
-var cameraModeUpdateBlock
+var cameraModeUpdateBlock 
 
+var stopMeasuringHRBlock = function (device,error,result){
+
+}
+
+var sportDataUpdateBlock = function (device, error, result){
+
+}
 
 // 大小端模式判定
 var littleEndian = (function () {
@@ -737,9 +744,6 @@ function parseReceivedData(data){
       break;
       case (CMD_IDs.RealTek_CMD_Setting):{
         parseSetCmdData(l1Payload, blockKey)
-
-
-
       }
       break;
       case (CMD_IDs.RealTek_CMD_Bind):{
@@ -750,6 +754,18 @@ function parseReceivedData(data){
 
       case (CMD_IDs.RealTek_CMD_Control):{
         parseContrlCmdData(l1Payload,blockKey)
+
+      }
+      break;
+
+      case (CMD_IDs.RealTek_CMD_Remind):{
+        parseRemindCmdData(l1Payload,blockKey)
+
+      }
+      break;
+
+      case (CMD_IDs.RealTek_CMD_SportData):{
+
 
       }
       break;
@@ -774,6 +790,70 @@ function getL2PayloadKeyWithL1PayLoad(l1Payload){
 /*
 * 解析绑定包
 */
+
+function parseSportCmdData(l1Payload, blockkey){
+  console.log("call parseSportCmdData")
+  var key = getL2PayloadKeyWithL1PayLoad(l1Payload)
+  var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
+  var l2PayLoad = l1Payload.slice(2)
+  var Sport_Keys = cmdPreDef.ZH_RealTek_Sport_Key
+  switch(key){
+    case Sport_Keys.RealTek_Key_HR_Cancel:{
+      var info = "Device measurements of heart rate have stopped!"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+      if(stopMeasuringHRBlock){
+        stopMeasuringHRBlock(connectedDevice,null,null)
+      }
+    }
+    break;
+    
+    case Sport_Keys.RealTek_Key_His_SportData_Syc_Begin:{
+      var info = "His SportData Syn begin!"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+    }
+    break;
+
+    case Sport_Keys.RealTek_Key_His_SportData_Syc_End:{
+      var info = "His SportData Syn end!"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+
+    }
+    break;
+
+    case Sport_Keys.RealTek_Key_Sport_Step_Rep:{
+      var sports = getStepItemsWithValue(l2PayLoad)
+      var info = "Step Syn Res Count: " + sports.length
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+      if(sportDataUpdateBlock){
+        sportDataUpdateBlock(connectedDevice,null,sports)
+      }
+
+    }
+    break;
+  }
+}
+
+
+
+function parseRemindCmdData(l1Payload, blockkey){
+  console.log("call parseRemindCmdData")
+  var key = getL2PayloadKeyWithL1PayLoad(l1Payload)
+  var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
+  var l2PayLoad = l1Payload.slice(2)
+  var remind_Keys = cmdPreDef.ZH_RealTek_Remind_Key
+  switch(key){
+    case (remind_Keys.RealTek_Key_Universal_Message):{
+      var callBack = characteristicValueWrtieBlocks[blockkey]
+      if (callBack) {
+        callBack(connectedDevice, null, null)
+        removeCacheBlockWithKey(blockkey)
+      }
+
+    }
+    break;
+  }
+
+}
 
 function parseBindCmdData(l1Payload,blockkey){
   console.log("call parseBindCmdData")
@@ -907,6 +987,80 @@ function parseSetCmdData(l1Payload, blockkey){
 
 }
 
+/*
+* 获取运动数据
+*/
+function getStepItemsWithValue(l2PayLoad) {
+  var sportHeaderSize = 4
+  var stepItemLength = 8
+
+  var cutyear = preModel.DF_RealTek_Date_Cut_Year
+
+  var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
+  var valueLengthPreBuffer = new DataView(value, 1, 1)
+  var valueLengthLateBuffer = new DataView(value, 2, 1)
+  var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
+  if(valueLength < sportHeaderSize){
+    var info = "Step Items Header length less than min length"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
+    return null;
+  }
+
+  
+  var l2PayLoadValue = l2PayLoad.slice(l2PayloadHeaderSize)
+  var year = ((new DataView(l2PayLoadValue, 0, 1)).getInt8(0) >> 1) & 0x3F
+  var month = (((new DataView(l2PayLoadValue, 0, 1)).getInt8(0) & 0x01) << 3) + ((new DataView(l2PayLoadValue, 1, 1)).getInt8(0) >> 5)
+  var day = (new DataView(l2PayLoadValue, 1, 1)).getInt8(0) &0x1F
+  var itemNumbers = (new DataView(l2PayLoadValue, 3, 1)).getInt8(0)
+  
+  var stepValue = l2PayLoadValue.slice(sportHeaderSize)
+  year = year + cutyear
+  var yearString = year+'-'+month+'-'+day
+
+  var steps = new Array()
+  for(var index=0; index<itemNumbers; index++){
+    var beginOffset = index*stepItemLength
+    var stepItemValue = stepValue.slice(beginOffset)
+
+    var offset = ((new DataView(stepItemValue, 0, 1)).getUint8(0) << 3) + ((new DataView(stepItemValue, 1, 1)).getUint8(0) >> 5)
+    var mode = ((new DataView(stepItemValue, 1, 1)).getUint8(0) >> 3) & 0x3
+    var stepCount = (((new DataView(stepItemValue, 1, 1)).getUint8(0) & 0x7) << 9) + ((new DataView(stepItemValue, 2, 1)).getUint8(0) << 1) + ((new DataView(stepItemValue, 3, 1)).getUint8(0) >> 7)
+    var activeTime = ((new DataView(stepItemValue, 3, 1)).getUint8(0) >> 3) & 0xf
+    var calories = (((new DataView(stepItemValue, 3, 1)).getUint8(0) & 0x7) << 16) + ((new DataView(stepItemValue, 4, 1)).getUint8(0) << 8) + (new DataView(stepItemValue, 5, 1)).getUint8(0)
+    var distance = ((new DataView(stepItemValue, 6, 1)).getUint8(0) << 8) + (new DataView(stepItemValue, 7, 1)).getUint8(0)
+
+    if(offset >= 96){
+      var info = "Sport Data error, offset more than 96: " + offset
+    }else{
+      var item = preModel.initSportItem()
+      item.date = yearString
+      item.dayOffset = offset
+      if (mode == 0) {
+        item.mode = preModel.ZH_RealTek_Sport_Mode.ZH_RealTek_Stationary;
+      } else if (mode == 1) {
+        item.mode = preModel.ZH_RealTek_Sport_Mode.ZH_RealTek_Walk;
+      } else if (mode == 2) {
+        item.mode = preModel.ZH_RealTek_Sport_Mode.ZH_RealTek_Run;
+      }
+      item.stepCount = stepCount;
+      item.activeTime = activeTime;
+      item.calories = calories;
+      item.distance = distance;
+
+      steps.push(item)
+
+    }
+
+    var info = "Parse Sport data date: " + yearString + "offset: " + offset + "mode: " + mode + "stepCount: " + stepCount + "activeTime: " + activeTime + "calories: " + calories + "distance: " +distance
+    
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+
+
+  }
+
+  return steps
+
+}
 
 /*
 * 获取所有闹钟列表

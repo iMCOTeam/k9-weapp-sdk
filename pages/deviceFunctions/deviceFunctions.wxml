@@ -1,4 +1,5 @@
 <view class='Cmd_list'>
+
   <view wx:if="{{bindCommands}}">
     <view class='section_title'>绑定命令</view>
     <block wx:for="{{bindCommands}}" wx:key="item.functionMode">
@@ -9,6 +10,7 @@
       </view>
     </block>
   </view>
+
   <view wx:if="{{setCommands}}">
     <view class='section_title'>设置命令</view>
     <block wx:for="{{setCommands}}" wx:key="item.functionMode">
@@ -22,4 +24,19 @@
       </view>
     </block>
   </view>
+
+  <view wx:if="{{sportCommands}}">
+    <view class='section_title'>运动命令</view>
+    <block wx:for="{{sportCommands}}" wx:key="item.functionMode">
+      <view class='section_items' catchtap='clickSportCmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">
+        <view class='section_item_title'>
+          <view class='title' catchtap='clickSportCmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">{{item.title}}</view>
+        </view>
+        <view class='SwitchView' wx:if="{{item.haveSwitch}}">
+          <switch type="switch" checked="true" bindchange="switchChange" data-functionmode="{{item.functionMode}}"></switch>
+        </view>
+      </view>
+    </block>
+  </view>
+
 </view>

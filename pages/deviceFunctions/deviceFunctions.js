@@ -9,7 +9,81 @@ Page({
   data: {
     deviceId: null,
     bindCommands: [],
-    setCommands: []
+    setCommands: [],
+    sportCommands: []
+  },
+  /**
+   * 生命周期函数--监听页面加载
+   */
+  onLoad: function (options) {
+    console.log("options", options.deviceId)
+    var bindCmds = this.getBindCommandKeys()
+    var setCmds = this.getSetCommandKeys()
+    var sportCmds = this.getSportCommandKeys()
+
+    this.setData({
+      deviceId: options.deviceId,
+      bindCommands: bindCmds,
+      setCommands: setCmds,
+      sportCommands: sportCmds
+    })
+  },
+
+  /**
+   * 生命周期函数--监听页面初次渲染完成
+   */
+  onReady: function () {
+
+  },
+
+  /**
+   * 生命周期函数--监听页面显示
+   */
+  onShow: function () {
+    var device = manager.getConnectedDevice()
+    if (device) {
+      wx.showToast({
+        title: device.deviceId,
+      })
+    } else {
+      console.log("have not find device")
+    }
+
+  },
+
+  /**
+   * 生命周期函数--监听页面隐藏
+   */
+  onHide: function () {
+
+  },
+
+  /**
+   * 生命周期函数--监听页面卸载
+   */
+  onUnload: function () {
+
+  },
+
+  /**
+   * 页面相关事件处理函数--监听用户下拉动作
+   */
+  onPullDownRefresh: function () {
+
+  },
+
+  /**
+   * 页面上拉触底事件的处理函数
+   */
+  onReachBottom: function () {
+
+  },
+
+  /**
+   * 用户点击右上角分享
+   */
+  onShareAppMessage: function () {
+
   },
 
   getBindCommandKeys: function(){
@@ -60,6 +134,22 @@ Page({
   },
 
   getSportCommandKeys: function(){
+    var ZHOnlyTitle = util.ZHFunctionCellMode.ZHOnlyTitle
+    var ZHTitleAndSwitch = util.ZHFunctionCellMode.ZHTitleAndSwitch
+    var functionMode = util.ZHFunctionMode
+    let that = this
+
+    var hisData = that.getFunctionObject("同步历史数据", ZHOnlyTitle, functionMode.ZHGetHistoryData)
+    var realTimeData = that.getFunctionObject("开启实时数据同步", ZHTitleAndSwitch, functionMode.ZHGetRealTimeData)
+    var getOnceHeartRate = that.getFunctionObject("请求一次心率数据", ZHOnlyTitle, functionMode.ZHOnceHR)
+
+    var getContinuousHR = that.getFunctionObject("心率数据连续测量", ZHTitleAndSwitch, functionMode.ZHContinuousHR)
+    var getContinuousHRSitting = that.getFunctionObject("获取连续心率设置是否开启", ZHOnlyTitle, functionMode.ZHGetContinuousHRSetting)
+    var synlastSportData = that.getFunctionObject("同步最近15分钟的运动数据", ZHOnlyTitle, functionMode.ZHSycLastSportData)
+    var synTodaySportData = that.getFunctionObject("同步今天所有运动数据", ZHOnlyTitle, functionMode.ZHSycTodayAllSportData)
+    var bloodPressure = that.getFunctionObject("血压测量", ZHTitleAndSwitch, functionMode.ZHBloodPressure)
+
+    return [hisData, realTimeData, getOnceHeartRate, getContinuousHR, getContinuousHRSitting, synlastSportData, synTodaySportData, bloodPressure];
 
   },
 
@@ -261,11 +351,23 @@ Page({
 
       }
       break;
-
-     
-
-      
     }
+  },
+
+  clickSportCmd:function(event){
+    var that = this
+    var haveSwitch = event.target.dataset.haveswitch
+    var functionMode = event.target.dataset.functionmode
+    console.log("click functionMode", functionMode)
+    if (haveSwitch) {
+      console.log("click functionMode haveSwitch")
+      return;
+    } else {
+      console.log("click functionMode not haveSwitch")
+    }
+
+    var Function_Keys = util.ZHFunctionMode
+
   },
 
   /* - Public Functions - */
@@ -1008,78 +1110,7 @@ Page({
 
     }
     })
-  },
-
-  /**
-   * 生命周期函数--监听页面加载
-   */
-  onLoad: function (options) {
-    console.log("options", options.deviceId)
-    var bindCmds = this.getBindCommandKeys()
-    var setCmds = this.getSetCommandKeys()
-    var num = 0
-    
-    this.setData({
-      deviceId: options.deviceId,
-      bindCommands: bindCmds,
-      setCommands: setCmds
-    })
-  },
-
-  /**
-   * 生命周期函数--监听页面初次渲染完成
-   */
-  onReady: function () {
-    
-  },
-
-  /**
-   * 生命周期函数--监听页面显示
-   */
-  onShow: function () {
-    var device = manager.getConnectedDevice()
-    if(device){
-      wx.showToast({
-        title: device.deviceId,
-      })
-    }else{
-      console.log("have not find device")
-    }
-    
-  },
-
-  /**
-   * 生命周期函数--监听页面隐藏
-   */
-  onHide: function () {
-    
-  },
-
-  /**
-   * 生命周期函数--监听页面卸载
-   */
-  onUnload: function () {
-    
-  },
-
-  /**
-   * 页面相关事件处理函数--监听用户下拉动作
-   */
-  onPullDownRefresh: function () {
-    
-  },
-
-  /**
-   * 页面上拉触底事件的处理函数
-   */
-  onReachBottom: function () {
-    
-  },
-
-  /**
-   * 用户点击右上角分享
-   */
-  onShareAppMessage: function () {
-    
   }
+
+  
 })
