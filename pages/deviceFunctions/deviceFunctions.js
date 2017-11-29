@@ -89,6 +89,9 @@ Page({
   },
 
   
+  /*
+  * User Interaction
+  */
   clickBindCmd: function (event){
     var that  = this
     var functionMode = event.target.dataset.functionmode
@@ -140,6 +143,37 @@ Page({
         break;
       case (Function_Keys.ZHSetRaiseHandLight):{
         that.turnWirstLight(enable)
+      }
+      break;
+      case (Function_Keys.ZHQQReminder):{
+        that.setQQNotification(enable)
+
+      }
+      break;
+      case (Function_Keys.ZHWeChatReminder): {
+        that.setWechatNotification(enable)
+
+      }
+        break;
+      case (Function_Keys.ZHLineReminder): {
+        that.setLineNotification(enable)
+
+      }
+        break;
+      case (Function_Keys.ZHIncomingReminder): {
+        that.setCallNotification(enable)
+
+      }
+        break;
+      case (Function_Keys.ZHSMSReminder):{
+        that.setSMSNotification(enable)
+
+      }
+      break;
+
+      case (Function_Keys.ZHSetScreenOrientation):{
+        that.setScreenOrientation(enable)
+
       }
       break;
     }
@@ -217,11 +251,267 @@ Page({
       }
       break;
 
+      case (Function_Keys.ZHGetScreenOrientation):{
+        that.getScreenOrientation()
+      }
+      break;
+
+      case (Function_Keys.ZHDeviceFunctions):{
+        that.getDeviceAllFunctions()
+
+      }
+      break;
+
+     
+
       
     }
   },
 
+  /* - Public Functions - */
+
+  showHaveNotFunctionReminder: function(){
+    wx.showToast({
+      title: '手环固件不支持该功能,请升级固件或者询问开发商',
+    })
+    
+
+  },
+
   /* - Functions - */
+
+  /*
+  *横竖屏设置
+  */
+
+  setScreenOrientation: function (enable){
+    wx.showLoading({
+      title: 'set Screen Orientation...',
+    })
+
+    var orientation = preModel.ZH_RealTek_ScreenOrientation.ZH_Orientation_Landscape;
+    if (!enable) {
+      orientation = preModel.ZH_RealTek_ScreenOrientation.ZH_Orientation_Portrait;
+    }
+    
+    manager.SetDisplayOrientation(orientation, function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "set Screen Orientation Success...",
+        })
+
+      }
+
+    })
+
+
+  },
+
+
+  /*
+  * 设置来电提醒
+  */
+  setCallNotification: function (enable) {
+    wx.showLoading({
+      title: 'set Call Notification...',
+    })
+    manager.setEnableCallNotificationEnabled(enable, function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "set Call Notification Success...",
+        })
+
+      }
+
+    })
+
+  },
+
+  
+
+  /*
+  * 设置Line提醒
+  */
+  setLineNotification: function (enable) {
+    wx.showLoading({
+      title: 'set Line Notification...',
+    })
+    manager.setEnableLineNotificationEnabled(enable, function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "set Line Notification Success...",
+        })
+
+      }
+
+    })
+
+  },
+
+  /*
+  * 设置SMS提醒
+  */
+  setSMSNotification: function (enable) {
+    wx.showLoading({
+      title: 'set SMS Notification...',
+    })
+    manager.setEnableSMSNotificationEnabled(enable, function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "set SMS Notification Success...",
+        })
+
+      }
+
+    })
+
+  },
+
+
+  /*
+  * 设置微信提醒
+  */
+  setWechatNotification: function (enable){
+    wx.showLoading({
+      title: 'set Wechat Notification...',
+    })
+    manager.setEnableWechatNotificationEnabled(enable, function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "set Wechat Notification Success...",
+        })
+
+      }
+
+    })
+
+  },
+
+  /*
+  * 设置QQ提醒
+  */
+  setQQNotification: function (enable){
+    wx.showLoading({
+      title: 'set QQ Notification...',
+    })
+    manager.setEnableQQNotificationEnabled(enable, function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "set QQ Notification Success...",
+        })
+
+      }
+
+    })
+
+
+  },
+
+  /*
+  * 获取设备包含的功能列表
+  */
+  getDeviceAllFunctions: function(){
+    wx.showLoading({
+      title: 'get Device Functions...',
+    })
+    manager.getDeviceFunstions(function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var info = "The device contains "
+        if (device.hasStepFunc){
+          info = info + "Step,"
+        }
+        if (device.hasHRMFunc){
+          info = info + "Heart,"
+
+        }
+        if (device.hasSleepFunc){
+          info = info + "Sleep,"
+        }
+        if (device.hasBloodPressureFunc){
+          info = info + "Blood pressure,"
+        }
+        if (device.hasOrientationSwitchFunc){
+          info = info + "Orientation Switch,"
+        }
+        if (device.hasWeChatSport){
+          info = info + "Wechat Sport"
+        }
+        info = info + "functions"
+        wx.showToast({
+          title: info,
+        })
+
+      }
+
+    })
+
+  },
+
+  /*
+  * 获取横竖屏方向
+  */
+
+  getScreenOrientation: function(){
+    wx.showLoading({
+      title: 'get ScreenOrientation status...',
+    })
+    manager.getDisplayOrientation(function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var orientation = result
+        var info = "Screen Orientation is "
+        if (orientation == preModel.ZH_RealTek_ScreenOrientation.ZH_Orientation_Landscape){
+          info = info + "Landscape"
+        }else{
+          info = info + "Portrait"
+        }
+        wx.showToast({
+          title: info,
+        })
+
+      }
+
+    })
+  },
 
   /*
   * 设置抬手亮屏
@@ -263,7 +553,7 @@ Page({
           title: error.errMsg,
         })
       } else {
-        var onOrOff = result ? "On": "Off";
+        var onOrOff = result ? " On": " Off";
         var info = "Turn Wrist is" + onOrOff
 
         wx.showToast({

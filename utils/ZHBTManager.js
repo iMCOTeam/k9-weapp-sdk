@@ -897,7 +897,7 @@ function parseSetCmdData(l1Payload, blockkey){
       getAllFunctionsWithValue(l2PayLoad)
       var callBack = characteristicValueWrtieBlocks[blockkey]
       if (callBack) {
-        callBack(connectedDevice, null, orientation)
+        callBack(connectedDevice, null, null)
         removeCacheBlockWithKey(blockkey)
       }
     }
@@ -986,28 +986,35 @@ function getAlarmsWithValue(value){
 */
 
 function getAllFunctionsWithValue(value){
+  common.printLogWithBuffer(value, "functions ")
   var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
   var valueLengthPreBuffer = new DataView(value, 1, 1)
   var valueLengthLateBuffer = new DataView(value, 2, 1)
   var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
+ 
   if(valueLength < 4){
     var info = "Get All Functions length is less than 4"
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
   }
+  var byteLength = value.byteLength
+  var offset = byteLength -1
+  var hasFakeBloodPressure = (new DataView(value, offset, 1)).getUint8(0) & 0x1
+ 
+  var hasRealBloodPressure = ((new DataView(value, offset, 1)).getUint8(0) >> 1) & 0x1
+  var hasHRM = ((new DataView(value, offset, 1)).getUint8(0) >> 2) & 0x1
+  var hasScreenSwitch = ((new DataView(value, offset, 1)).getUint8(0) >> 3) & 0x1
+  var hasStep = ((new DataView(value, offset, 1)).getUint8(0) >> 4) & 0x1
+  var hasSleep = ((new DataView(value, offset, 1)).getUint8(0) >> 5) & 0x1
+  var hasWechatSport = ((new DataView(value, offset, 1)).getUint8(0) >> 6) & 0x1
 
-  var hasFakeBloodPressure = new DataView(value, 3, 1).getUint8(0) & 0x1
-  var hasRealBloodPressure = (new DataView(value, 3, 1).getUint8(0) >> 1) & 0x1
-  var hasHRM = (new DataView(value, 3, 1).getUint8(0) >> 2) & 0x1
-  var hasScreenSwitch = (new DataView(value, 3, 1).getUint8(0) >> 3) & 0x1
-  var hasStep = (new DataView(value, 3, 1).getUint8(0) >> 4) & 0x1
-  var hasSleep = (new DataView(value, 3, 1).getUint8(0) >> 5) & 0x1
-
+  
   connectedDevice.hasBloodPressureFunc = hasFakeBloodPressure || hasRealBloodPressure
   connectedDevice.hasHRMFunc = hasHRM
   connectedDevice.hasStepFunc = hasStep
   connectedDevice.hasOrientationSwitchFunc = hasScreenSwitch
   connectedDevice.hasSleepFunc = hasSleep
   connectedDevice.hasGetFuncVlaue = true
+
   if(functionsHaveUpdated){
     functionsHaveUpdated(connectedDevice,null,null)
   }
@@ -2118,9 +2125,38 @@ function setTurnWristLightEnabled(enable,callBack){
 }
 
 /*
-* Get Functions
+* 获取横竖屏状态
+*/
+function getDisplayOrientation(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Get_ScreenOrientationReq
+  var seqId = getSeqIDWithCommand(cmd, key)
+
+  var keyValue = null
+  var keyValueLength = 0
+  var packet = getL0PacketWithCommandId(cmd, key, keyValue, keyValueLength, false, false, seqId)
+
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+}
+
+/*
+* Get device Functions
 */
 function getDeviceFunstions(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
   var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
   var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Get_FunctionsReq
   var seqId = getSeqIDWithCommand(cmd, key)
@@ -2129,13 +2165,140 @@ function getDeviceFunstions(callBack){
   sendDataToBandDevice({
     data: packet,
     ackBool: false,
-    callBack: null
+    callBack: callBack
   })
 }
 
 
+/* ----  Notification ------ */
 
-//function getL0Packet(commandId, key, keyValue)
+/*
+* Set Call Notification
+*/
+
+function setEnableCallNotificationEnabled(enable, callBack) {
+  var value = enable ? 1 : 2;
+  setNotificationEnable(enable, value, callBack)
+}
+
+
+/*
+* Set QQ Notification
+*/
+function setEnableQQNotificationEnabled(enable, callBack){
+  var value = enable ? 3 : 4;
+  setNotificationEnable(enable,value,callBack)
+}
+
+
+/*
+* Set wechat Notification
+*/
+
+function setEnableWechatNotificationEnabled(enable, callBack){
+  var value = enable ? 5 : 6;
+  setNotificationEnable(enable, value, callBack)
+}
+
+/*
+* Set SMS Notification
+*/
+
+function setEnableSMSNotificationEnabled(enable, callBack) {
+  var value = enable ? 7 : 8;
+  setNotificationEnable(enable, value, callBack)
+}
+
+/*
+* Set Line Notification
+*/
+
+function setEnableLineNotificationEnabled(enable, callBack) {
+  var value = enable ? 9 : 10;
+  setNotificationEnable(enable, value, callBack)
+}
+
+
+
+
+function setNotificationEnable(enable, value,callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  wx.getSystemInfo({
+    success: function(res) {
+      var platform = res.platform
+      if(!enable || (platform != "ios")){
+        var valueBuffer = new Uint8Array(1)
+        valueBuffer[0] = value
+        var buffer = valueBuffer.buffer
+
+        var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+        var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_IncomingTel_OnOff
+        var seqId = getSeqIDWithCommand(cmd, key)
+        var keyValueLength = 1;
+        var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
+        sendDataToBandDevice({
+          data: packet,
+          ackBool: false,
+          callBack: callBack
+        })
+
+      }else{
+        var os = preModel.ZH_RealTek_OS.ZH_RealTek_OS_iOS
+        setMoblieOS(os,function(device,error,result){
+          if(error){
+            if(callBack){
+              callBack(device,error,result)
+            }
+          }else{
+            var valueBuffer = new Uint8Array(1)
+            valueBuffer[0] = value
+            var buffer = valueBuffer.buffer
+
+            var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+            var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_IncomingTel_OnOff
+            var seqId = getSeqIDWithCommand(cmd, key)
+            var keyValueLength = 1;
+            var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
+            sendDataToBandDevice({
+              data: packet,
+              ackBool: false,
+              callBack: callBack
+            })
+          }
+        })
+
+       
+      }
+    },
+  })
+}
+
+/*
+* 设置横竖屏
+*/
+function SetDisplayOrientation(orientation,callBack){
+  var valueBuffer = new Uint8Array(1)
+  valueBuffer[0] = orientation
+  var buffer = valueBuffer.buffer
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Setting
+  var key = cmdPreDef.ZH_RealTek_Setting_Key.RealTek_Key_Set_ScreenOrientation
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValueLength = 1;
+  var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+}
+
+/*
+* Send Data to Device
+*/
 
 function sendDataToBandDevice(obj){
   console.log("call sendDataToBandDevice")
@@ -2340,8 +2503,6 @@ function haveResDataWithCmd(cmd,key){
 // 对外可见模块
 module.exports = {
   getConnectedDevice: getConnectedDevice,
-  connectedDeviceId: connectedDeviceId,
-  Singleton: Singleton,
   initialBTManager: initialBTManager,
   openBluetoothAdapter : openBluetoothAdapter,
   closeBluetoothAdapter: closeBluetoothAdapter,
@@ -2383,6 +2544,14 @@ module.exports = {
   setMoblieOS: setMoblieOS,
   setCameraMode: setCameraMode,
   getTurnWristLightEnabledOnFinished: getTurnWristLightEnabledOnFinished,
-  setTurnWristLightEnabled: setTurnWristLightEnabled
-  
+  setTurnWristLightEnabled: setTurnWristLightEnabled,
+  getDisplayOrientation: getDisplayOrientation,
+  getDeviceFunstions: getDeviceFunstions,
+  setEnableCallNotificationEnabled: setEnableCallNotificationEnabled,
+  setEnableQQNotificationEnabled: setEnableQQNotificationEnabled,
+  setEnableWechatNotificationEnabled: setEnableWechatNotificationEnabled,
+  setEnableSMSNotificationEnabled: setEnableSMSNotificationEnabled,
+  setEnableLineNotificationEnabled: setEnableLineNotificationEnabled,
+  SetDisplayOrientation: SetDisplayOrientation
+
 }

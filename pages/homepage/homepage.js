@@ -51,6 +51,17 @@ Page({
    * 生命周期函数--监听页面加载
    */
   onLoad: function (options) {
+
+    wx.getSystemInfo({
+      success: function (res) {
+        var platform = res.platform
+        if (platform == "ios") {
+          console.log("platform is ios")
+        } else {
+          console.log("platform is not ios")
+        }
+      },
+    })
     console.log('homepage has loaded')
 
     var num = 255
