@@ -1,6 +1,6 @@
 const util = require('../../utils/util.js')
 const manager = require("../../utils/ZHBTManager.js")
-let preModel = require("../../utils/ZHBTModel.js")
+const preModel = require("../../utils/ZHBTModel.js")
 
 Page({
   /**

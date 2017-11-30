@@ -1,7 +1,7 @@
-var realTekBTManager = require('../../utils/ZHBTManager.js')
-var preDef = require('../../utils/ZHBTServiceDef.js')
-var common = require("../../utils/ZHCommon.js")
-var cmdPreDef = require("../../utils/ZHBTCmdPreDef.js")
+const realTekBTManager = require('../../utils/ZHBTManager.js')
+const preDef = require('../../utils/ZHBTServiceDef.js')
+const common = require("../../utils/ZHCommon.js")
+const cmdPreDef = require("../../utils/ZHBTCmdPreDef.js")
 
 Page({
   /**
