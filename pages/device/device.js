@@ -117,6 +117,13 @@ Page({
    * 生命周期函数--监听页面加载
    */
   onLoad: function (options) {
+
+    var minute = 140
+    var hour = minute/60
+    hour = parseInt(hour)
+    var min = minute%60
+    var info = "hour:" + hour + " minute:" + min
+    console.log(info)
     
 
   },

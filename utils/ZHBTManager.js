@@ -49,10 +49,29 @@ var stopMeasuringHRBlock = function (device,error,result){
 var sportDataUpdateBlock = function (device, error, result){
   var nums = result.length
   var info = "Receive sport data " + nums
+  console.log("sportDataUpdateBlock:", nums)
   wx.showToast({
     title: info,
   })
 
+}
+
+var sleepDataUpdateBlock = function (device, error, result){
+  var nums = result.length
+  var info = "Receive sleep data " + nums
+  wx.showToast({
+    title: info,
+  })
+}
+
+var heartRateDataUpdateBlock = function (device, error, result){
+ 
+  var nums = result.length
+  console.log("heartRateDataUpdateBlock:", nums)
+  var info = "Receive HeartRate data " + nums
+  wx.showToast({
+    title: info,
+  })
 }
 
 // 大小端模式判定
@@ -790,7 +809,6 @@ function getL2PayloadKeyWithL1PayLoad(l1Payload){
 */
 
 function parseSportCmdData(l1Payload, blockkey){
-  console.log("call parseSportCmdData")
   var key = getL2PayloadKeyWithL1PayLoad(l1Payload)
   var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
   var l2PayLoad = l1Payload.slice(2)
@@ -835,6 +853,28 @@ function parseSportCmdData(l1Payload, blockkey){
       common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
       if(sportDataUpdateBlock){
         sportDataUpdateBlock(connectedDevice,null,sports)
+      }
+
+    }
+    break;
+
+
+    case Sport_Keys.RealTek_Key_Sport_Sleep_Rep:{
+      var info = "Sleep Syn Res!"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+      var sleeps = getSleepItemsWithValue(l2PayLoad)
+      if(sleepDataUpdateBlock){
+        sleepDataUpdateBlock(connectedDevice,null,sleeps)
+      }
+    }
+    break;
+
+    case Sport_Keys.RealTek_Key_HR_Rep:{
+      var info = "Heart rate update Res!"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+      var heartRates = getHeartRateItemsWithValue(l2PayLoad)
+      if (heartRateDataUpdateBlock){
+        heartRateDataUpdateBlock(connectedDevice,null,heartRates)
       }
 
     }
@@ -1025,12 +1065,189 @@ function getCalibrationItem(l2PayLoad){
   }
 }
 
+
+/*
+* 获取心率数据
+*/
+
+function getHeartRateItemsWithValue(l2PayLoad){
+  var info = "call getHeartRateItemsWithValue"
+  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+
+  var hrHeaderSize = 4
+  var hrItemLength = 4
+  var cutyear = preModel.DF_RealTek_Date_Cut_Year
+
+  var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
+  var valueLengthPreBuffer = new DataView(l2PayLoad, 1, 1)
+  var valueLengthLateBuffer = new DataView(l2PayLoad, 2, 1)
+  var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
+
+  if(valueLength < hrHeaderSize){
+    var info = "Heart rate Items Header length less than min length"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
+    return null
+  }
+
+  var l2PayLoadValue = l2PayLoad.slice(l2PayloadHeaderSize)
+
+  var year = ((new DataView(l2PayLoadValue, 0, 1)).getUint8(0) >> 1) & 0x3F
+  var month = (((new DataView(l2PayLoadValue, 0, 1)).getUint8(0) & 0x01) << 3) + ((new DataView(l2PayLoadValue, 1, 1)).getUint8(0) >> 5)
+  var day = (new DataView(l2PayLoadValue, 1, 1)).getUint8(0) & 0x1F
+  var itemCount = (new DataView(l2PayLoadValue, 2, 1)).getUint8(0) * 0x100 + (new DataView(l2PayLoadValue, 3, 1)).getUint8(0)
+  year  = year + cutyear
+
+  var hrValue = l2PayLoadValue.slice(hrHeaderSize)
+
+  var heartRates = new Array()
+  for (var index = 0; index < itemCount; index++) {
+    var beginOffset = index * hrItemLength
+    var hrItemValue = hrValue.slice(beginOffset)
+    var minutes = (new DataView(hrItemValue, 0, 1)).getUint8(0) * 0x100 + (new DataView(hrItemValue, 1, 1)).getUint8(0)
+    var seconds = (new DataView(hrItemValue, 2, 1)).getUint8(0)
+    var hrp = (new DataView(hrItemValue, 3, 1)).getUint8(0)
+    var hour = minutes/60
+    hour = parseInt(hour)
+    var min = minutes%60
+
+    var timeString = year + '-' + month + '-' + day + '-' + hour + '-' + min + '-' + seconds
+
+    var info = "Heart item time:" + timeString + " HRate:" + hrp
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+
+    var hrItem = preModel.initHRItem()
+    hrItem.time = timeString
+    hrItem.heartRate = hrp
+
+    heartRates.push(hrItem)
+
+  }
+
+  return heartRates
+
+
+}
+
+/*
+* 获取睡眠数据
+*/
+function getSleepItemsWithValue(l2PayLoad){
+  var info = "call getSleepItemsWithValue"
+  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+  
+  var sleepHeaderSize = 4
+  var sleepItemLength = 4
+  var cutyear = preModel.DF_RealTek_Date_Cut_Year
+
+  var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
+  var valueLengthPreBuffer = new DataView(l2PayLoad, 1, 1)
+  var valueLengthLateBuffer = new DataView(l2PayLoad, 2, 1)
+  var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
+
+  if(valueLength < sleepHeaderSize){
+    var info = "Sleep Items Header length less than min length"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
+    return null;
+  }
+
+  var l2PayLoadValue = l2PayLoad.slice(l2PayloadHeaderSize)
+
+  var year = ((new DataView(l2PayLoadValue, 0, 1)).getUint8(0) >> 1) & 0x3F
+  var month = (((new DataView(l2PayLoadValue, 0, 1)).getUint8(0) & 0x01) << 3) + ((new DataView(l2PayLoadValue, 1, 1)).getUint8(0) >> 5)
+  var day = (new DataView(l2PayLoadValue, 1, 1)).getUint8(0) & 0x1F
+  var itemNumbers = (new DataView(l2PayLoadValue, 3, 1)).getUint8(0)
+  var newYear = year + cutyear
+
+  var sleepValue = l2PayLoadValue.slice(sleepHeaderSize)
+
+  var sleeps = new Array()
+  
+  for (var index = 0; index < itemNumbers; index++) {
+    var beginOffset = index * sleepItemLength
+    var sleepItemValue = sleepValue.slice(beginOffset)
+
+    var allminute = ((new DataView(sleepItemValue, 0, 1)).getUint8(0) << 8) + (new DataView(sleepItemValue, 1, 1)).getUint8(0)
+    var mode = (new DataView(sleepItemValue, 3, 1)).getUint8(0) & 0xf
+    if((allminute >= 24*60) || (mode == 0) || (mode>3) ){
+      var info = "Sleep Data Error-allMinute:" + allminute + " mode:" + mode
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
+    }else{
+      var item = preModel.initSleepItem()
+      var Sleep_Modes = preModel.ZH_RealTek_Sleep_Mode
+      if(mode == 0x01){
+        item.mode = Sleep_Modes.ZH_RealTek_LightSleep
+      }else if(mode == 0x02){
+        item.mode = Sleep_Modes.ZH_RealTek_DeepSleep
+      }else{
+        item.mode = Sleep_Modes.ZH_RealTek_Awake
+      }
+
+      var hour = allminute/60
+      hour = parseInt(hour)
+      var minute = allminute%60
+      if(hour == 24){
+        hour = 0
+        day = day +1
+      }
+      var timeString = year + '-' + month + '-' + day + '-' + hour + '-' + minute
+
+      item.startTime = timeString
+
+      var info = "Parse sleep data:startTime:" + timeString + " Mode:" + mode
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+      
+      var containBool = filterSameStartTimeSleepItem(sleeps,item)
+      if(containBool){
+        info = "Sleep item reduplicate startTime:" + timeString
+        common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+      }
+
+      var beginTime = 10
+      var endTime = 18
+
+      if(hour > beginTime && hour < endTime){
+        containBool = true
+        info = "Delete Sleep data time is not at 18-10.Time:" + timeString
+        common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
+
+      }
+      if(!containBool){
+        steps.push(item)
+      }
+
+      
+
+    }
+  }
+
+  return sleeps
+
+
+}
+
+
+/*
+* 过滤重复的睡眠数据
+*/
+function filterSameStartTimeSleepItem(sleeps,item){
+  var containBool = false
+  var timeString = item.startTime
+  for(var subItem in sleeps){
+    var subTimeString = subItem.startTime
+    if(subTimeString == timeString){
+      containBool = true
+    }
+  }
+
+  return containBool
+
+}
+
 /*
 * 获取运动数据
 */
 function getStepItemsWithValue(l2PayLoad) {
-  var info = "call getStepItemsWithValue"
-  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+  
   var sportHeaderSize = 4
   var stepItemLength = 8
 
@@ -2027,6 +2244,9 @@ function synTimeonFinished(callBack){
 
 }
 
+/*
+* 获取时间buffer
+*/
 function getDateValue(date) {
   var cutYear = preModel.DF_RealTek_Date_Cut_Year
 
@@ -2494,6 +2714,26 @@ function SetDisplayOrientation(orientation,callBack){
   })
 }
 
+/*
+* 同步历史运动数据
+*/
+function synHisDataOnFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
+  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_Sport_Req
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValueLength = 0;
+  var packet = getL0PacketWithCommandId(cmd, key, null, keyValueLength, false, false, seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
 
 /*
 *设置是否获取手环的实时数据
@@ -2525,6 +2765,84 @@ function setRealTimeSynSportData(enable, callBack){
 
 }
 
+/*
+* 请求一次心率数据
+*/
+function setHRReadOneTimeEnable(enable, callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var keyValue =enable ? 1:0;
+  
+  var valueBuffer = new Uint8Array(1)
+  valueBuffer[0] = keyValue
+  var buffer = valueBuffer.buffer
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
+  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_HR_OneTime
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValueLength = 1;
+  var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
+
+/*
+* 设置连续测量心率数据（每隔一段时间）
+*/
+
+function setHRReadContinuous(enable,minutes,callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var keyValue = enable ? 1 : 0;
+
+  var valueBuffer = new Uint8Array(2)
+  valueBuffer[0] = keyValue
+  valueBuffer[1] = minutes
+  var buffer = valueBuffer.buffer
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
+  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_HR_Continuous
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValueLength = 2;
+  var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+
+}
+
+/*
+* 获取连续测量心率数据是否开启
+*/
+
+function getHRReadContinuousSettingOnFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
+  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_HR_GetContinuousSet
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValueLength = 0;
+  var packet = getL0PacketWithCommandId(cmd, key, null, keyValueLength, false, false, seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
 
 /*
 * Send Data to Device
@@ -2783,6 +3101,10 @@ module.exports = {
   setEnableSMSNotificationEnabled: setEnableSMSNotificationEnabled,
   setEnableLineNotificationEnabled: setEnableLineNotificationEnabled,
   SetDisplayOrientation: SetDisplayOrientation,
-  setRealTimeSynSportData, setRealTimeSynSportData
+  synHisDataOnFinished: synHisDataOnFinished,
+  setRealTimeSynSportData, setRealTimeSynSportData,
+  setHRReadOneTimeEnable: setHRReadOneTimeEnable,
+  getHRReadContinuousSettingOnFinished: getHRReadContinuousSettingOnFinished,
+  setHRReadContinuous: setHRReadContinuous
 
 }

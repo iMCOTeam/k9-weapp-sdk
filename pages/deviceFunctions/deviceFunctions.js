@@ -372,6 +372,12 @@ Page({
     }
 
     var Function_Keys = util.ZHFunctionMode
+    switch(functionMode){
+      case Function_Keys.ZHGetHistoryData:{
+        that.getHisData()
+      }
+      break;
+    }
 
   },
 
@@ -386,6 +392,29 @@ Page({
   },
 
   /* - Functions - */
+
+  /*
+  * 获取历史数据
+  */
+
+  getHisData: function(){
+    wx.showLoading({
+      title: 'get HisData...',
+    })
+    manager.synHisDataOnFinished(function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "get HisData Success...",
+        })
+
+      }
+    })
+  },
 
   /*
   * 实时数据同步设置

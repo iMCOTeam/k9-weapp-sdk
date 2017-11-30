@@ -1,5 +1,8 @@
 let DF_RealTek_Date_Cut_Year = 2000 //年份默认以2000年开始计算所以传输需要减去2000
 
+/*
+* 发送命令回调函数 
+*/
 let CALLBACK = function(device, error, result){
 
 }
@@ -140,12 +143,13 @@ let ZH_RealTek_Sleep_Mode = {
   ZH_RealTek_LightSleep: 2
 }
 
+
 let ZH_RealTek_ScreenOrientation = {
   ZH_Orientation_Landscape: 0,
   ZH_Orientation_Portrait: 1
 }
 
-
+//自定义错误
 function initError(code,errMsg){
   var error = new Object()
   error.code = code
@@ -153,6 +157,7 @@ function initError(code,errMsg){
   return error
 }
 
+//设备
 function initDevice(){
   var device = new Object()
   device.name = null
@@ -170,6 +175,7 @@ function initDevice(){
   return device
 }
 
+//闹钟
 function initAlarm(){
   var alarm = new Object()
   var date = new Date()
@@ -189,6 +195,7 @@ function initAlarm(){
   return alarm
 }
 
+//久坐提醒
 function initLongSit(){
   var longSit = new Object()
   longSit.enable = false  // On or off,default is No
@@ -201,6 +208,7 @@ function initLongSit(){
   return longSit
 }
 
+//运动数据
 function initSportItem(){
   var sportItem = new Object()
   sportItem.date = null ////The date of sport. （format：yyyy-MM-dd,2015-06-07)
@@ -214,17 +222,16 @@ function initSportItem(){
   return sportItem
 }
 
-
+//睡眠数据
 function initSleepItem(){
   var sleepItem = new Object()
   sleepItem.startTime = null // The start time. （format：yyyy-MM-dd-HH-mm,2015-06-07-08-03)
-  sleepItem.endTime = null  // The end time. （format：yyyy-MM-dd-HH-mm,2015-06-07-08-04)
   sleepItem.mode = 0 // The pre item sleep mode.
-  sleepItem.lastMode = 0 //The last item sleep mode.
   return sleepItem
 
 }
 
+//心率数据
 function initHRItem(){
   var hrItem = new Object()
   hrItem.time = null // The time. （format：yyyy-MM-dd-HH-mm-ss,2015-06-07-08-03-09)
@@ -232,6 +239,7 @@ function initHRItem(){
   return hrItem
 }
 
+//血压数据
 function initBPItem(){
   var bpItem = new Object()
   bpItem.time = null
@@ -241,6 +249,7 @@ function initBPItem(){
   return bpItem
 }
 
+//同步运动数据结束后的总数据（可作为校验使用）
 function initSportCalibrationItem(){
   var item = new Object()
   item.offset = 0
