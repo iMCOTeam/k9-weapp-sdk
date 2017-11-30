@@ -1,6 +1,6 @@
-# About iMCO_K9_SDK 
+# About k9-weapp-sdk 
 
-`iMCO_K9_SDK` is designed to help iMCO Smart band and mobile commnunication framework.Without iMCO permission can not be disclosed to third parties in any way.
+`k9-weapp-sdk` is designed to help iMCO Smart band and mobile commnunication framework.Without iMCO permission can not be disclosed to third parties in any way.
 
 
 
