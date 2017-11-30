@@ -1,7 +1,7 @@
 # ReleaseNote
 
 * Author:zhuo
-* Description: iMCO Smart band SDK for iOS Application.
+* Description: iMCO Smart band SDK for WechatSmallApps.
 * Copyright(C)2017 iMCO Inc.
 
 
@@ -19,7 +19,7 @@
 
 ### Git Version
 
-
+08f028f438e19bb4ca88c3313b27f6d4cc7e7341
 
 ### New Features
 
