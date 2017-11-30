@@ -271,6 +271,11 @@ Page({
 
       }
       break;
+
+      case Function_Keys.ZHContinuousHR:{
+        that.setContinuousHeartRate(enable)
+      }
+      break;
     }
     
 
@@ -377,6 +382,16 @@ Page({
         that.getHisData()
       }
       break;
+
+      case Function_Keys.ZHOnceHR:{
+        that.getOneceHeartRate()
+      }
+      break;
+
+      case Function_Keys.ZHGetContinuousHRSetting:{
+        that.getContinuousHeartRateSetting()
+      }
+      break;
     }
 
   },
@@ -392,6 +407,129 @@ Page({
   },
 
   /* - Functions - */
+
+  /*
+  * 同步某个15分钟内的运动数据
+  */
+
+  sycLastSportData: function(){
+    var steps = 200;
+    var activeTime = 9;
+    var calory = 500;
+    var distance = 400;
+
+    var date = new Date()
+    var hour = date.getHours()
+    var minute = date.getMinutes() 
+    var numMin = parseInt(minute/15)
+    var offset = hour*4 + numMin
+
+
+  },
+
+
+  /*
+  * 获取连续测量心率设置
+  */
+
+  getContinuousHeartRateSetting:function(){
+    wx.showLoading({
+      title: 'get Continuous HeartRate Set...',
+    })
+
+    manager.getHRReadContinuousSettingOnFinished(function (device, error, result){
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var enable = result
+        var info = "continuous measurement of heart rate is on"
+        if(!enable){
+          info = "continuous measurement of heart rate is off"
+        }
+        wx.showToast({
+          title: info,
+        })
+      }
+    })
+  },
+
+
+
+  /*
+  * 设置连续测量心率
+  */
+
+  setContinuousHeartRate: function(enable){
+    wx.showLoading({
+      title: 'set Continuous HeartRate...',
+    })
+
+    var minute = 1
+
+    manager.setRealTimeSynSportData(true, function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        manager.setHRReadContinuous(enable,minute, function (device, error, result) {
+          wx.hideLoading()
+          if (error) {
+            wx.showToast({
+              title: error.errMsg,
+            })
+          } else {
+            wx.showToast({
+              title: "Enable Read Continuous hear rate success...",
+            })
+          }
+        })
+        
+      }
+    })
+
+
+    
+
+  },
+
+  /*
+  * 请求心率数据
+  */
+
+  getOneceHeartRate: function(){
+    wx.showLoading({
+      title: 'get Onece HeartRate...',
+    })
+    manager.setRealTimeSynSportData(true, function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        
+        manager.setHRReadOneTimeEnable(true,function(device,error,result){
+          if (error) {
+            wx.showToast({
+              title: error.errMsg,
+            })
+          }else{
+            wx.showToast({
+              title: "Enable Read oneTime heart rate success...",
+            })
+
+          }
+        })
+
+      }
+    })
+
+  },
+
 
   /*
   * 获取历史数据

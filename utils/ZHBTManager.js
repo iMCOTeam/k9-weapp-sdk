@@ -837,7 +837,6 @@ function parseSportCmdData(l1Payload, blockkey){
       var callBack = characteristicValueWrtieBlocks[blockkey]
 
       if (callBack) {
-        console.log("have callBack")
         callBack(connectedDevice, null, caliItem)
         removeCacheBlockWithKey(blockkey)
       }
@@ -875,6 +874,24 @@ function parseSportCmdData(l1Payload, blockkey){
       var heartRates = getHeartRateItemsWithValue(l2PayLoad)
       if (heartRateDataUpdateBlock){
         heartRateDataUpdateBlock(connectedDevice,null,heartRates)
+      }
+
+    }
+    break;
+
+    case Sport_Keys.RealTek_Key_HR_GetContinuousSet_Rep:{
+      var info = "Get Heart rate Continuous Res!"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+      var enableCode = new DataView(l2PayLoad, 3, 1).getUint8(0)
+      var enable = true
+      if(!enableCode){
+        enable = false
+      }
+      var callBack = characteristicValueWrtieBlocks[blockkey]
+
+      if (callBack) {
+        callBack(connectedDevice, null, enable)
+        removeCacheBlockWithKey(blockkey)
       }
 
     }
@@ -1432,6 +1449,8 @@ function getAllFunctionsWithValue(value){
 
 }
 
+
+
 /*
 * 获取所有服务
 */
@@ -1454,6 +1473,8 @@ function getAllServices(){
     }
   })
 }
+
+
 
 
 /*
@@ -2845,6 +2866,78 @@ function getHRReadContinuousSettingOnFinished(callBack){
 }
 
 /*
+* 同步当天总步数
+*/
+
+function synTodayTotalSportDataWithStep(totalSteps, totalDistance, totalCalory, callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var info = "Calibration total sport data. totalSteps:" + totalSteps + " totalCalory:" + totalCalory + " totalDistance:" + totalDistance 
+  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+  var buffer = new ArrayBuffer(12)
+  var caloryView = new DataView(buffer, 0, 4)
+  var stepView = new DataView(buffer, 4, 4)
+  var distanceView = new DataView(buffer, 8, 11)
+
+  caloryView.setUint32(0, totalCalory, false)
+  stepView.setUint32(0, totalSteps, false)
+  distanceView.setUint32(0, totalDistance, false)
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
+  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_Last_SportStatus_Syn
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValueLength = 12;
+  var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
+
+/*
+* 同步某个15分钟内的运动数据
+*/
+function synRecentSportDataWithStep(steps, activeTime, calory, distance, offset, mode, callBack) {
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+
+  var info = "Calibration recent sport data. steps:" + steps + " calory:" + calory + " distance:" + distance + " offset:" + offset
+  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
+
+  var buffer = new ArrayBuffer(10)
+  var modeView = new DataView(buffer,0,1)
+  var activeTimeView = new DataView(buffer,1,1)
+  var caloryView = new DataView(buffer,2,4)
+  var stepView = new DataView(buffer,6,2)
+  var distanceView = new DataView(buffer,8,2)
+
+  modeView.setUint8(0,mode)
+  activeTimeView.setUint8(0,activeTime)
+  caloryView.setUint32(0,calory,false)
+  stepView.setUint16(0,steps,false)
+  distanceView.setUint16(0,steps,false)
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
+  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_Last_SportStatus_Syn
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValueLength = 10;
+  var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+
+}
+
+/*
 * Send Data to Device
 */
 
@@ -3105,6 +3198,8 @@ module.exports = {
   setRealTimeSynSportData, setRealTimeSynSportData,
   setHRReadOneTimeEnable: setHRReadOneTimeEnable,
   getHRReadContinuousSettingOnFinished: getHRReadContinuousSettingOnFinished,
-  setHRReadContinuous: setHRReadContinuous
+  setHRReadContinuous: setHRReadContinuous,
+  synRecentSportDataWithStep: synRecentSportDataWithStep,
+  synTodayTotalSportDataWithStep: synTodayTotalSportDataWithStep
 
 }
