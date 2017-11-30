@@ -247,6 +247,7 @@ function initSportCalibrationItem(){
   item.totalSteps = 0
   item.totalCalory = 0
   item.totalDistance = 0
+  return item
 }
 
 

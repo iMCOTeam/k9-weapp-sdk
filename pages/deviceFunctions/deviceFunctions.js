@@ -266,6 +266,11 @@ Page({
 
       }
       break;
+      case (Function_Keys.ZHGetRealTimeData):{
+        that.getRealTimeStepData(enable)
+
+      }
+      break;
     }
     
 
@@ -381,6 +386,30 @@ Page({
   },
 
   /* - Functions - */
+
+  /*
+  * 实时数据同步设置
+  */
+
+  getRealTimeStepData: function(enable){
+    wx.showLoading({
+      title: 'set syn RealTime StepData...',
+    })
+    manager.setRealTimeSynSportData(enable, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "set syn RealTime StepData Success...",
+        })
+
+      }
+    })
+
+  },
 
   /*
   *横竖屏设置

@@ -45,9 +45,29 @@ Page({
     
   },
    
-  
+  /**
+  * 打开蓝牙适配器
+  */
+  openBluetoothAdaper: function(){
+    var that = this
+    realTekBTManager.openBluetoothAdapter({
+       success: function (res) {
+         that.scanDevice()
+       },
+       fail: function (res) {
+         wx.stopPullDownRefresh()
+         wx.showToast({
+           title: res.errMsg,
 
-  // 搜索设备
+         })
+       }
+    })
+
+  },
+  
+  /**
+  * 搜索设备
+  */
   scanDevice: function(){
     wx.showLoading({
       title: '搜索中...',
@@ -60,30 +80,30 @@ Page({
       allowDuplicatesKey: true,
       interval: 0,
       success: function (res) {//成功后则去获取已发现的蓝牙设备
-        console.log("startBluetoothDevicesDiscovery success")
         realTekBTManager.getBluetoothDevices({
           success: function(res){
-            console.log("getBluetoothDevices success"+ JSON.stringify(res))
             if (res.devices && (res.devices.length > 0)){
-              console.log("divices count" + res.devices.length)
               wx.hideLoading()
               that.setData({
                 discoverDevices: res.devices
               })
             }else{
+              var info = "device count is 0 Please Pull Down Refresh" 
               wx.showToast({
-                title: 'device count is 0',
+                title: info,
               })
             }
 
           },
           fail: function(res){
-            console.log("getBluetoothDevices fail" + res.errMsg)
             wx.hideLoading()
             wx.showToast({
               title: res.errMsg,
             })
 
+          },
+          complete: function (res){
+            wx.stopPullDownRefresh()
           }
         })
 
@@ -97,50 +117,7 @@ Page({
    * 生命周期函数--监听页面加载
    */
   onLoad: function (options) {
-    common.printDebugInfo("zhuozhuo test", common.ZH_Log_Level.ZH_Log_Error)
     
-    var buffer = realTekBTManager.getL2HeaderWithCommandId(cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_Bind)
-    common.printLogWithBuffer(buffer,"test test")
-
-    var testIdenti = 12
-    if(testIdenti){
-      console.log("testIdentifier 1111")
-    }
-
-    var testUndi = 33
-    if(testUndi){
-      console.log("testIdentifier 222")
-    }
-
-    
-
-
-    //先获取已经连接手机的特殊设备（UUIDS）
-    /*realTekBTManager.getConnectedBluetoothDevices({
-      services: that.data.serviceUUIDs,
-      success: function (res) {
-        if (res.devices) {
-          if (that.data.discoverDevices.length > 0) {
-            var connectedDevices = new Array()
-            res.devices.forEach(function (value, index, a) {
-              var temDevice = new Object()
-              temDevice.name = value.name
-              temDevice.deviceId = value.deviceId
-              temDevice.localName = value.name
-              temDevice.RSSI = 0
-              connectedDevices.concat(temDevice)
-            })
-            that.setData({
-              discoverDevices: connectedDevices
-            })
-          }
-        }
-      },
-      fail: function (res) {
-
-      }
-    })*/
-
 
   },
 
@@ -160,27 +137,10 @@ Page({
    * 生命周期函数--监听页面显示
    */
   onShow: function () {
-    
-
-    realTekBTManager.Singleton ++
-    console.log("device page onShow:", realTekBTManager.Singleton)
-
-   
-    let that = this
-    realTekBTManager.openBluetoothAdapter({
-      success: function (res) {
-        console.log("openBluetoothAdapter success")
-        that.scanDevice()
-      },
-      fail: function (res) {
-        console.log("open bluetoolth fail" ,res.errMsg)
-        wx.showToast({
-          title: res.errMsg,
-
-        })
-      }
-    })
+    this.openBluetoothAdaper()
   },
+
+
 
   /**
    * 生命周期函数--监听页面隐藏
@@ -201,6 +161,8 @@ Page({
    */
   onPullDownRefresh: function () {
     console.log("page onPullDownReresh")
+    this.openBluetoothAdaper()
+
   },
 
   /**

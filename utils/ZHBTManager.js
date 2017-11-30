@@ -47,6 +47,11 @@ var stopMeasuringHRBlock = function (device,error,result){
 }
 
 var sportDataUpdateBlock = function (device, error, result){
+  var nums = result.length
+  var info = "Receive sport data " + nums
+  wx.showToast({
+    title: info,
+  })
 
 }
 
@@ -68,16 +73,6 @@ function appendBuffer(buffer1, buffer2) {
 // functions
 function initialBTManager(obj){
   
-  openBluetoothAdapter({
-    success: function(res) {
-      bluetoolthavailable = true
-    },
-    fail: function(res) {
-      bluetoolthavailable = false
-
-    }
-  })
-
   //监听蓝牙适配器状态改变
   onBluetoothAdapterStateChange(function (res){
     if (!res.discovering){
@@ -173,11 +168,13 @@ function removeCacheBlockWithKey(key){
 function openBluetoothAdapter(obj) {
   wx.openBluetoothAdapter({
     success: function (res) {
+      bluetoolthavailable = true
       if (obj.success) {
         obj.success(res)
       }
     },
     fail: function (res) {
+      bluetoolthavailable = false
       if (obj.fail) {
         obj.fail(res)
       }
@@ -765,6 +762,7 @@ function parseReceivedData(data){
       break;
 
       case (CMD_IDs.RealTek_CMD_SportData):{
+        parseSportCmdData(l1Payload,blockKey)
 
 
       }
@@ -788,7 +786,7 @@ function getL2PayloadKeyWithL1PayLoad(l1Payload){
 
 
 /*
-* 解析绑定包
+* 解析包
 */
 
 function parseSportCmdData(l1Payload, blockkey){
@@ -817,10 +815,21 @@ function parseSportCmdData(l1Payload, blockkey){
       var info = "His SportData Syn end!"
       common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
 
+      var caliItem = getCalibrationItem(l2PayLoad)
+      var callBack = characteristicValueWrtieBlocks[blockkey]
+
+      if (callBack) {
+        console.log("have callBack")
+        callBack(connectedDevice, null, caliItem)
+        removeCacheBlockWithKey(blockkey)
+      }
+
     }
     break;
 
     case Sport_Keys.RealTek_Key_Sport_Step_Rep:{
+      var info = "Sport_Step_Rep!"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
       var sports = getStepItemsWithValue(l2PayLoad)
       var info = "Step Syn Res Count: " + sports.length
       common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
@@ -987,18 +996,49 @@ function parseSetCmdData(l1Payload, blockkey){
 
 }
 
+
+function getCalibrationItem(l2PayLoad){
+  var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
+  var valueLengthPreBuffer = new DataView(l2PayLoad, 1, 1)
+  var valueLengthLateBuffer = new DataView(l2PayLoad, 2, 1)
+  var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
+  var calibrationItemLength = 13
+  if(valueLength < calibrationItemLength){
+    var info = "Calibration Item is null"
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
+    return null;
+  }else{
+    var offset = (new DataView(l2PayLoad, 3, 1)).getUint8(0)
+    var totalSteps = ((new DataView(l2PayLoad, 4, 1)).getUint8(0) << 24) + ((new DataView(l2PayLoad, 5, 1)).getUint8(0) << 16) + ((new DataView(l2PayLoad, 6, 1)).getUint8(0) << 8) + (new DataView(l2PayLoad, 7, 1)).getUint8(0)
+    var totalCalories = ((new DataView(l2PayLoad, 8, 1)).getUint8(0) << 24) + ((new DataView(l2PayLoad, 9, 1)).getUint8(0) << 16) + ((new DataView(l2PayLoad, 10, 1)).getUint8(0) << 8) + (new DataView(l2PayLoad, 11, 1)).getUint8(0)
+    var totalDistance = ((new DataView(l2PayLoad, 12, 1)).getUint8(0) << 24) + ((new DataView(l2PayLoad, 13, 1)).getUint8(0) << 16) + ((new DataView(l2PayLoad, 14, 1)).getUint8(0) << 8) + (new DataView(l2PayLoad, 15, 1)).getUint8(0)
+
+    var info = "Calibration today total Sportdata" + " offset: " + offset + " totalSteps:" + totalSteps + " totalCalory:" + totalCalories + " totalDistance:" + totalDistance
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+
+    var calibration = preModel.initSportCalibrationItem()
+    calibration.offset = offset
+    calibration.totalSteps = totalSteps
+    calibration.totalCalory = totalCalories
+    calibration.totalDistance = totalDistance
+    return calibration
+  }
+}
+
 /*
 * 获取运动数据
 */
 function getStepItemsWithValue(l2PayLoad) {
+  var info = "call getStepItemsWithValue"
+  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
   var sportHeaderSize = 4
   var stepItemLength = 8
 
   var cutyear = preModel.DF_RealTek_Date_Cut_Year
 
   var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
-  var valueLengthPreBuffer = new DataView(value, 1, 1)
-  var valueLengthLateBuffer = new DataView(value, 2, 1)
+  var valueLengthPreBuffer = new DataView(l2PayLoad, 1, 1)
+  var valueLengthLateBuffer = new DataView(l2PayLoad, 2, 1)
   var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
   if(valueLength < sportHeaderSize){
     var info = "Step Items Header length less than min length"
@@ -1008,10 +1048,10 @@ function getStepItemsWithValue(l2PayLoad) {
 
   
   var l2PayLoadValue = l2PayLoad.slice(l2PayloadHeaderSize)
-  var year = ((new DataView(l2PayLoadValue, 0, 1)).getInt8(0) >> 1) & 0x3F
-  var month = (((new DataView(l2PayLoadValue, 0, 1)).getInt8(0) & 0x01) << 3) + ((new DataView(l2PayLoadValue, 1, 1)).getInt8(0) >> 5)
-  var day = (new DataView(l2PayLoadValue, 1, 1)).getInt8(0) &0x1F
-  var itemNumbers = (new DataView(l2PayLoadValue, 3, 1)).getInt8(0)
+  var year = ((new DataView(l2PayLoadValue, 0, 1)).getUint8(0) >> 1) & 0x3F
+  var month = (((new DataView(l2PayLoadValue, 0, 1)).getUint8(0) & 0x01) << 3) + ((new DataView(l2PayLoadValue, 1, 1)).getUint8(0) >> 5)
+  var day = (new DataView(l2PayLoadValue, 1, 1)).getUint8(0) &0x1F
+  var itemNumbers = (new DataView(l2PayLoadValue, 3, 1)).getUint8(0)
   
   var stepValue = l2PayLoadValue.slice(sportHeaderSize)
   year = year + cutyear
@@ -1051,7 +1091,7 @@ function getStepItemsWithValue(l2PayLoad) {
 
     }
 
-    var info = "Parse Sport data date: " + yearString + "offset: " + offset + "mode: " + mode + "stepCount: " + stepCount + "activeTime: " + activeTime + "calories: " + calories + "distance: " +distance
+    var info = "Parse Sport data date: " + yearString + " offset: " + offset + " mode: " + mode + " stepCount: " + stepCount + " activeTime: " + activeTime + " calories: " + calories + " distance: " +distance
     
     common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
 
@@ -2434,6 +2474,10 @@ function setNotificationEnable(enable, value,callBack){
 * 设置横竖屏
 */
 function SetDisplayOrientation(orientation,callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
   var valueBuffer = new Uint8Array(1)
   valueBuffer[0] = orientation
   var buffer = valueBuffer.buffer
@@ -2449,6 +2493,38 @@ function SetDisplayOrientation(orientation,callBack){
     callBack: callBack
   })
 }
+
+
+/*
+*设置是否获取手环的实时数据
+*/
+
+function setRealTimeSynSportData(enable, callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  var keyValue = 0x00;
+  if (enable) {
+    keyValue = 0x01;
+  }
+  var valueBuffer = new Uint8Array(1)
+  valueBuffer[0] = keyValue
+  var buffer = valueBuffer.buffer
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
+  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_Set_SportData_Syc_OnOff
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValueLength = 1;
+  var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+}
+
 
 /*
 * Send Data to Device
@@ -2706,6 +2782,7 @@ module.exports = {
   setEnableWechatNotificationEnabled: setEnableWechatNotificationEnabled,
   setEnableSMSNotificationEnabled: setEnableSMSNotificationEnabled,
   setEnableLineNotificationEnabled: setEnableLineNotificationEnabled,
-  SetDisplayOrientation: SetDisplayOrientation
+  SetDisplayOrientation: SetDisplayOrientation,
+  setRealTimeSynSportData, setRealTimeSynSportData
 
 }

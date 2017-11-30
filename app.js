@@ -1,22 +1,20 @@
 
 const realTekBTManager = require('./utils/ZHBTManager.js')
+const util = require("./utils/util.js")
 //app.js
 App({
   onLaunch: function () {
-    console.log("App lanched")
-
     // 展示本地存储能力
     var logs = wx.getStorageSync('logs') || []
-    logs.unshift("App lanched")
+    var timeString = util.formatTime(new Date())
+    var info = "App lanched: " + timeString
+    logs.unshift(info)
     wx.setStorageSync('logs', logs)
 
 
     //初始化蓝牙适配器
     realTekBTManager.initialBTManager();
 
-    
-
-    
     // 登录
     wx.login({
       success: res => {
