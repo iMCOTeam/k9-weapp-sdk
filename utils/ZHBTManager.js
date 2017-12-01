@@ -323,6 +323,7 @@ function onBluetoothAdapterStateChange(obj){
 */
 
 function startBluetoothDevicesDiscovery(obj){
+ 
   wx.startBluetoothDevicesDiscovery({
     success: function(res) {
       if(obj.success){
@@ -2058,6 +2059,16 @@ function getCharacteristicNotFindError(){
   var error = preModel.initError(code, errMsg)
   return error
 }
+
+
+function getWechatNotUseError(){
+  var code = preModel.ZH_RealTek_Error_Code.ZHWechatVersionNotSupportErrorCode
+  var errMsg = "The WeChat version is too low to upgrade."
+  var error = preModel.initError(code, errMsg)
+  return error
+
+}
+
 
 /*
 * 获取自定义SeqID 

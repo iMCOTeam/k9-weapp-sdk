@@ -44,7 +44,31 @@ Page({
     })
     
   },
+
+  /*
+  * 兼容判定
+  */
    
+ getSystemInfo:function(){
+   var that = this
+   wx.getSystemInfo({
+     success: function(res) {
+       var sdkVersion = res.SDKVersion
+       var version = parseFloat(sdkVersion)
+       if(version < 1.1){
+         wx.showModal({
+           title: '提示',
+           content: '当前微信版本过低，无法使用该功能，请升级到最新微信版本后重试。'
+         })
+       }else{
+         that.openBluetoothAdaper()
+       }
+       
+     },
+   })
+
+ },
+
   /**
   * 打开蓝牙适配器
   */
@@ -124,7 +148,6 @@ Page({
     var min = minute%60
     var info = "hour:" + hour + " minute:" + min
     
-    
 
   },
 
@@ -144,7 +167,7 @@ Page({
    * 生命周期函数--监听页面显示
    */
   onShow: function () {
-    this.openBluetoothAdaper()
+    this.getSystemInfo()
   },
 
 
@@ -168,7 +191,7 @@ Page({
    */
   onPullDownRefresh: function () {
     console.log("page onPullDownReresh")
-    this.openBluetoothAdaper()
+    this.getSystemInfo()
 
   },
 

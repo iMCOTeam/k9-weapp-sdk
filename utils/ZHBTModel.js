@@ -16,7 +16,8 @@ let ZH_RealTek_Error_Code = {
   ZHUpdateFirmWareFaild: 100005,
   ZHBindErrorCode: 100006,
   ZHTimeOutErrorCode: 100007,
-  ZHFirmWareUrlIsEmptyErrorCode: 100008
+  ZHFirmWareUrlIsEmptyErrorCode: 100008,
+  ZHWechatVersionNotSupportErrorCode: 100009
 }
 
 /* - 腾讯蓝牙接口错误码 - */
