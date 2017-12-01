@@ -39,4 +39,18 @@
     </block>
   </view>
 
+  <view wx:if="{{assistCommands}}">
+    <view class='section_title'>辅助命令</view>
+    <block wx:for="{{assistCommands}}" wx:key="item.functionMode">
+      <view class='section_items' catchtap='clickAssistCmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">
+        <view class='section_item_title'>
+          <view class='title' catchtap='clickAssistCmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">{{item.title}}</view>
+        </view>
+        <view class='SwitchView' wx:if="{{item.haveSwitch}}">
+          <switch type="switch" checked="true" bindchange="switchChange" data-functionmode="{{item.functionMode}}"></switch>
+        </view>
+      </view>
+    </block>
+  </view>
+
 </view>

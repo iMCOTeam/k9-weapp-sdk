@@ -3,6 +3,7 @@ const manager = require("../../utils/ZHBTManager.js")
 const preModel = require("../../utils/ZHBTModel.js")
 
 Page({
+
   /**
    * 页面的初始数据
    */
@@ -10,8 +11,11 @@ Page({
     deviceId: null,
     bindCommands: [],
     setCommands: [],
-    sportCommands: []
+    sportCommands: [],
+    assistCommands: []
   },
+
+
   /**
    * 生命周期函数--监听页面加载
    */
@@ -20,12 +24,15 @@ Page({
     var bindCmds = this.getBindCommandKeys()
     var setCmds = this.getSetCommandKeys()
     var sportCmds = this.getSportCommandKeys()
+    var assistCmds = this.getAssistCommandKeys()
 
     this.setData({
       deviceId: options.deviceId,
       bindCommands: bindCmds,
       setCommands: setCmds,
-      sportCommands: sportCmds
+      sportCommands: sportCmds,
+      assistCommands: assistCmds
+
     })
   },
 
@@ -154,6 +161,22 @@ Page({
   },
 
   getAssistCommandKeys: function(){
+
+    var ZHOnlyTitle = util.ZHFunctionCellMode.ZHOnlyTitle
+    var ZHTitleAndSwitch = util.ZHFunctionCellMode.ZHTitleAndSwitch
+    var functionMode = util.ZHFunctionMode
+    let that = this
+
+    var findBand = that.getFunctionObject("查找我的手环", ZHOnlyTitle, functionMode.ZHFindBand)
+    var modifyDeviceName = that.getFunctionObject("修改设备名称", ZHOnlyTitle, functionMode.ZHSetBandName)
+    var getBandDeviceName = that.getFunctionObject("获取设备名称", ZHOnlyTitle, functionMode.ZHGetBandName)
+    var getBattery = that.getFunctionObject("获取电量等级", ZHOnlyTitle, functionMode.ZHGetBattery)
+    var getAppVersion = that.getFunctionObject("获取固件App版本", ZHOnlyTitle, functionMode.ZHGetAppVersion)
+    var getPatchVersion = that.getFunctionObject("获取固件Patch版本", ZHOnlyTitle, functionMode.ZHGetPatchVersion)
+    var getMacAddress = that.getFunctionObject("获取固件Mac地址", ZHOnlyTitle, functionMode.ZHGetMacAddress)
+  
+
+    return [findBand, modifyDeviceName, getBandDeviceName, getBattery, getAppVersion, getPatchVersion, getMacAddress];
 
   },
 
@@ -415,6 +438,61 @@ Page({
 
   },
 
+  clickAssistCmd: function (event){
+    var that = this
+    var haveSwitch = event.target.dataset.haveswitch
+    var functionMode = event.target.dataset.functionmode
+    console.log("click functionMode", functionMode)
+    if (haveSwitch) {
+      console.log("click functionMode haveSwitch")
+      return;
+    } else {
+      console.log("click functionMode not haveSwitch")
+    }
+
+    var Function_Keys = util.ZHFunctionMode
+    switch (functionMode){
+      case Function_Keys.ZHFindBand:{
+        that.findDevice()
+      }
+      break;
+
+      case Function_Keys.ZHSetBandName:{
+        that.modifyName()
+      }
+      break;
+
+      case Function_Keys.ZHGetBandName:{
+        that.getdeviceName()
+
+      }
+      break;
+
+      case Function_Keys.ZHGetBattery:{
+        that.getBatteryLevel()
+
+      }
+      break;
+
+      case Function_Keys.ZHGetAppVersion:{
+        that.getFirmWareAppVersion()
+      }
+      break;
+
+      case Function_Keys.ZHGetPatchVersion:{
+        that.getFirmWarePatchVersion()
+      }
+      break;
+
+      case Function_Keys.ZHGetMacAddress:{
+        that.getFirmWareMacAdress()
+      }
+      break;
+
+    }
+
+  },
+
   /* - Public Functions - */
 
   showHaveNotFunctionReminder: function(){
@@ -426,6 +504,183 @@ Page({
   },
 
   /* - Functions - */
+
+
+  /*
+  * 获取mac 地址
+  */
+
+  getFirmWareMacAdress: function(){
+    wx.showLoading({
+      title: 'get MacAddress ...',
+    })
+
+    manager.getMacAddressonFinished(function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var info = "MacAddress:" + result
+        wx.showToast({
+          title: info,
+        })
+
+      }
+    })
+
+  },
+
+  /*
+  * 获取固件patch版本
+  */
+
+  getFirmWarePatchVersion: function(){
+    wx.showLoading({
+      title: 'get Patch AppVersion ...',
+    })
+    manager.getOTAPatchVersiononFinished(function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var info = "PatchVersion:" + result
+        wx.showToast({
+          title: info,
+        })
+
+      }
+    })
+
+  },
+
+  /*
+  *  获取固件App版本
+  */
+
+  getFirmWareAppVersion:function(){
+    wx.showLoading({
+      title: 'get FirmWare AppVersion ...',
+    })
+    manager.getOTAApplicationVersiononFinished(function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var info = "AppVersion:" + result
+        wx.showToast({
+          title: info,
+        })
+
+      }
+    })
+
+  },
+
+  /*
+  * 获取电量
+  */
+
+  getBatteryLevel: function(){
+    wx.showLoading({
+      title: 'Get Battery Level ...',
+    })
+    manager.getBatteryLevelonFinished(function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var info = "Level" + result
+        wx.showToast({
+          title: info,
+        })
+
+      }
+    })
+  },
+
+  /*
+  * 获取设备名称
+  */
+  getdeviceName: function(){
+    wx.showLoading({
+      title: 'Get Device Name ...',
+    })
+
+    manager.getDeviceNameonFinished(function (device, error, result) {
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var info = "Device Name" + result
+        wx.showToast({
+          title: info,
+        })
+
+      }
+    })
+
+  },
+
+  /*
+  * 修改设备名称
+  */
+  modifyName: function(){
+    wx.showLoading({
+      title: 'modify Device Name ...',
+    })
+    var name = "test_zhuo"
+    manager.modifyDeviceName(name, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "modify Device Name Success...",
+        })
+
+      }
+    })
+
+
+  },
+
+  /*
+  * 查找我的手环
+  */
+
+  findDevice: function(){
+    wx.showLoading({
+      title: 'find my Device...',
+    })
+
+    manager.findMyBandDeviceonFinished(function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "find my Device Success...",
+        })
+
+      }
+    })
+
+  },
+
 
   /*
   * 血压测量

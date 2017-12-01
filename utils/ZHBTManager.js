@@ -16,6 +16,10 @@ var receiveDataSeq = 0 //接收数据时的序列号
 var Singleton = null
 
 var allServices = null //该设备所有服务
+var immediateRemindServiceObj = null //立即查找手环Service
+var lossServiceObj = null //防丢Service 
+var batteryServiceObj = null //电量Service
+
 var writeCharObj = null //发送命令特征
 var notifyCharObj = null //接收命令或数据的特征
 var immediateCharObj = null //查找手环特征
@@ -91,6 +95,27 @@ var stopMeasuringBloodPressureBlock = function (device, error, result) {
   })
 }
 
+
+var deviceNameHaveReadBlock = function (device, error, result){
+
+}
+
+var batteryValueHaveReadBlock = function (device, error, result){
+
+}
+
+var otaAppVersionHaveReadBlock = function (device, error, result){
+
+}
+
+var otaPatchVersionHaveReadBlock = function(device, error, result){
+
+}
+
+var macAddressHaveReadBlock = function (device, error, result) {
+
+}
+
 // 大小端模式判定
 var littleEndian = (function () {
   var buffer = new ArrayBuffer(2);
@@ -161,6 +186,10 @@ function clearCaches()
   receiveDataSeq = 0 
 
   allServices = null 
+  immediateRemindServiceObj = null 
+  lossServiceObj = null  
+  batteryServiceObj = null 
+
   writeCharObj = null 
   notifyCharObj = null 
   immediateCharObj = null
@@ -584,10 +613,17 @@ function handleCharacteristicValue(obj){
       
     }
     if (charUUIDString.indexOf(preDefChar.RealTek_DeviceName_CharUUID) != -1) {
-      
+      var name = getStringWithBuffer(value)
+      if(deviceNameHaveReadBlock){
+        deviceNameHaveReadBlock(connectedDevice,null,name)
+      }
     }
     if (charUUIDString.indexOf(preDefChar.RealTek_BatteryLevel_CharUUID) != -1) {
-      
+      var dataView = new DataView(value)
+      var batteyLevel = dataView.getUint8(0)
+      if(batteryValueHaveReadBlock){
+        batteryValueHaveReadBlock(connectedDevice,null,batteyLevel)
+      }
     }
 
     if (charUUIDString.indexOf(preDefChar.RealTek_OTAPatchVersion_CharUUID) != -1) {
@@ -595,24 +631,49 @@ function handleCharacteristicValue(obj){
       var dev = new DataView(resultValue)
       var version = dev.getUint16(0, littleEndian)
       OTApatchVersion = version   
-      var info = "read RealTek_OTAPatchVersion_CharUUID Success-" + version
-
-      console.log("read RealTek_OTAPatchVersion_CharUUIDchcSuccess-",version)
+      if(otaPatchVersionHaveReadBlock){
+        otaPatchVersionHaveReadBlock(connectedDevice,null,OTApatchVersion)
+      }
 
     }
     if (charUUIDString.indexOf(preDefChar.RealTek_OTAAppVersion_CharUUID) != -1) {
-      console.log("read RealTek_OTAAppVersion_CharUUID Success")
       var resultValue = value
       var dev = new DataView(resultValue)
       var version = dev.getUint16(0, littleEndian)
       OTAappVersion = version
-      console.log("read RealTek_OTAAppVersion_CharUUID Success-", version)
+      if (otaAppVersionHaveReadBlock) {
+        otaAppVersionHaveReadBlock(connectedDevice, null, OTApatchVersion)
+      }
+    }
+    if (charUUIDString.indexOf(preDefChar.RealTek_OTABDAddress_CharUUID) != -1)
+    {
+      var macString = getMacAddress(value)
+      macAddress = macString
+      if(macAddressHaveReadBlock){
+        macAddressHaveReadBlock(connectedDevice,null,macAddress)
+      }
     }
 
     if (charUUIDString.indexOf(preDefChar.RealTek_Functions_CharUUID) != -1) {
       functionsCharObj = characteristic
     }
   }
+}
+
+function getMacAddress(value){
+  var buffer = new Uint8Array(value)
+  var length = buffer.length
+  var result = "";
+  for (var index = 0; index < length; index++) {
+    var num = buffer[index] & 0xff
+    var numString = num < 16 ? "0" + num.toString(16) : num.toString(16)
+    result = result + numString
+    if(index != (length-1)){
+      result = result + ":"
+    }
+  }
+
+ return result.toUpperCase()
 }
 
 /*
@@ -1508,6 +1569,8 @@ function getAlarmsWithValue(value){
 }
 
 
+
+
 /*
 * 获取设备所有功能
 */
@@ -1562,6 +1625,7 @@ function getAllServices(){
       allServices = services
       for(var i=0;i<services.length;i++){
         var service = services[i]
+        handleService(service)
         getAllCharacteristics(service.uuid)
       }
     },
@@ -1573,7 +1637,19 @@ function getAllServices(){
   })
 }
 
-
+function handleService(service){
+  var serviceUUID = service.uuid
+  var preDefSer = preDefService.RealTek_ServiceUUIDs
+  if (serviceUUID.indexOf(preDefSer.RealTek_Immediate_Remind_ServiceUUID) != -1 ){
+    immediateRemindServiceObj = service
+  }
+  if (serviceUUID.indexOf(preDefSer.RealTek_Link_Loss_ServiceUUID) != -1 ){
+    lossServiceObj = service
+  }
+  if (serviceUUID.indexOf(preDefSer.RealTek_Battery_ServiceUUID) != -1) {
+    batteryServiceObj = service
+  }
+}
 
 
 /*
@@ -1641,7 +1717,6 @@ function handleCharacteristic(serviceUUID,characteristic){
         serviceId: serviceUUID,
         characteristicId: characteristic.uuid,
         success: function (res) {
-          console.log("Read OTAPatchVersion Success:", JSON.stringify(res))
         },
         fail: function (res) {
           var info = "Read OTAPatchVersion fail" + res.errMsg + "characteristicUUID:" + characteristic.uuid
@@ -1663,7 +1738,6 @@ function handleCharacteristic(serviceUUID,characteristic){
         serviceId: serviceUUID,
         characteristicId: characteristic.uuid,
         success: function (res) {
-          console.log("Read OTAAppVersion Success:", JSON.stringify(res))
         },
         fail: function (res) {
           var info = "Read OTAAppVersion fail" + res.errMsg + "characteristicUUID:" + characteristic.uuid
@@ -1678,6 +1752,31 @@ function handleCharacteristic(serviceUUID,characteristic){
     }
     
   }
+
+  if (charUUIDString.indexOf(preDefChar.RealTek_OTABDAddress_CharUUID) != -1 ){
+    macAddressCharObj = characteristic
+    if (characteristic.properties.read) {
+      readBLECharacteristicValue({
+        deviceId: deviceId,
+        serviceId: serviceUUID,
+        characteristicId: characteristic.uuid,
+        success: function (res) {
+        },
+        fail: function (res) {
+          var info = "Read macAddress fail" + res.errMsg + "characteristicUUID:" + characteristic.uuid
+          common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
+
+        },
+        complete: function (res) {
+
+        },
+      })
+
+    }
+
+  }
+
+
 
   if (charUUIDString.indexOf(preDefChar.RealTek_Functions_CharUUID) != -1 ){
     functionsCharObj = characteristic
@@ -1887,7 +1986,7 @@ function sendSuccessAck(seq,callBack){
 // ArrayBuffer转为字符串，参数为ArrayBuffer对象
 
 function getStringWithBuffer(buf) {
-   return String.fromCharCode.apply(null, new Uint16Array(buf));
+   return String.fromCharCode.apply(null, new Uint8Array(buf));
 }
 
 // 字符串转为ArrayBuffer对象，参数为字符串
@@ -1900,15 +1999,6 @@ function getBufferWithString(str) {
          bufView[i] = str.charCodeAt(i);
     }
     return buf
-
-  // var uintArray = [];
-  // var strLen = str.length
-  // for (var i = 0; i < strLen; i++) {
-  //   uintArray.push(str.charCodeAt(i))
-  // }
-  // var bufView = Uint8Array(uintArray)
-  // return bufView.buffer
-
     
 }
 
@@ -1954,6 +2044,17 @@ function getDisconnectedError() {
 function getWechatCustomError(res){
   var code = res.errCode
   var errMsg = res.errMsg
+  var error = preModel.initError(code, errMsg)
+  return error
+}
+
+/*
+* 特征没有找到错误
+*/
+
+function getCharacteristicNotFindError(){
+  var code = preModel.ZH_RealTek_Error_Code.ZHCharactiristicNotFindCode
+  var errMsg = "The Characteristic not find"
   var error = preModel.initError(code, errMsg)
   return error
 }
@@ -2227,11 +2328,11 @@ function findMyBandDeviceonFinished(callBack){
   if(immediateCharObj){
     var buffer = new ArrayBuffer(1)
     var data = new Uint8Array(buffer)
-    data[0] = 1
+    data[0] = 2
     
     writeBLECharacteristicValue({
       deviceId: connectedDeviceId,
-      serviceId: common.RealTek_ServiceUUIDs.RealTek_Immediate_Remind_ServiceUUID,
+      serviceId: immediateRemindServiceObj.uuid,
       characteristicId: immediateCharObj.uuid,
       value: buffer,
       success: function(res){
@@ -2249,6 +2350,11 @@ function findMyBandDeviceonFinished(callBack){
       }
 
     })
+  }else{
+    if (callBack) {
+      var error = getCharacteristicNotFindError()
+      callBack(connectedDevice, error, null)
+    }
   }
 }
 
@@ -3062,8 +3168,250 @@ function setBloodPressueEnable(enable,callBack){
     callBack: callBack
   })
 
+}
+
+/*
+* Modify device name
+*/
+
+function modifyDeviceName(name,callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  if (deviceNameCharObj) {
+    var buffer = getBufferWithString(name)
+
+    writeBLECharacteristicValue({
+      deviceId: connectedDeviceId,
+      serviceId: preDefService.RealTek_ServiceUUIDs.RealTek_BroadServiceUUID,
+      characteristicId: deviceNameCharObj.uuid,
+      value: buffer,
+      success: function (res) {
+        if (callBack) {
+          callBack(connectedDevice, null, null)
+        }
+
+      },
+      fail: function (res) {
+        if (callBack) {
+          var error = getWechatCustomError(res);
+          callBack(connectedDevice, error, null)
+        }
+
+      }
+
+    })
+  } else {
+    if (callBack) {
+      var error = getCharacteristicNotFindError()
+      callBack(connectedDevice, error, null)
+    }
+  }
 
 }
+
+/*
+* 获取设备名称
+*/
+function getDeviceNameonFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+
+  if (deviceNameCharObj) {
+    readBLECharacteristicValue({
+      deviceId: connectedDeviceId,
+      serviceId: preDefService.RealTek_ServiceUUIDs.RealTek_BroadServiceUUID,
+      characteristicId: deviceNameCharObj.uuid,
+      success: function (res) {
+        deviceNameHaveReadBlock = callBack
+
+      },
+      fail: function (res) {
+        if (callBack) {
+          var error = getWechatCustomError(res);
+          callBack(connectedDevice, error, null)
+        }
+
+      }
+
+    })
+  } else {
+    if (callBack) {
+      var error = getCharacteristicNotFindError()
+      callBack(connectedDevice, error, null)
+    }
+  }
+}
+
+
+/*
+* 获取电量
+*/
+
+function getBatteryLevelonFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+
+  if(batterylevelCharObj){
+    readBLECharacteristicValue({
+      deviceId: connectedDeviceId,
+      serviceId: batteryServiceObj.uuid,
+      characteristicId: batterylevelCharObj.uuid,
+      success: function (res) {
+        batteryValueHaveReadBlock = callBack
+
+      },
+      fail: function (res) {
+        if (callBack) {
+          var error = getWechatCustomError(res);
+          callBack(connectedDevice, error, null)
+        }
+
+      }
+
+    })
+
+  } else {
+    if (callBack) {
+      var error = getCharacteristicNotFindError()
+      callBack(connectedDevice, error, null)
+    }
+  }
+
+}
+
+
+/*
+* 获取固件App version
+*/
+function getOTAApplicationVersiononFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  if(OTAappVersion > 0){
+    if (callBack){
+      callBack(connectedDevice,null,OTAappVersion)
+    }
+    return
+  }
+  if(OTAAppVersionCharObj){
+    readBLECharacteristicValue({
+      deviceId: connectedDeviceId,
+      serviceId: preDefService.RealTek_ServiceUUIDs.RealTek_OTAInfo_ServiceUUID,
+      characteristicId: OTAAppVersionCharObj.uuid,
+      success: function (res) {
+        otaAppVersionHaveReadBlock = callBack
+      },
+      fail: function (res) {
+        if (callBack) {
+          var error = getWechatCustomError(res);
+          callBack(connectedDevice, error, null)
+        }
+      }
+
+    })
+
+
+  }else{
+    if (callBack) {
+      var error = getCharacteristicNotFindError()
+      callBack(connectedDevice, error, null)
+    }
+  }
+}
+
+/*
+* 获取固件Patch version
+*/
+
+function getOTAPatchVersiononFinished(callBack) {
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  if (OTApatchVersion > 0) {
+    if (callBack) {
+      callBack(connectedDevice, null, OTApatchVersion)
+    }
+    return
+  }
+
+  if (OTAAppVersionCharObj) {
+    readBLECharacteristicValue({
+      deviceId: connectedDeviceId,
+      serviceId: preDefService.RealTek_ServiceUUIDs.RealTek_OTAInfo_ServiceUUID,
+      characteristicId: OTAPatchVersioCharObj.uuid,
+      success: function (res) {
+        otaPatchVersionHaveReadBlock = callBack
+
+      },
+      fail: function (res) {
+        if (callBack) {
+          var error = getWechatCustomError(res);
+          callBack(connectedDevice, error, null)
+        }
+
+      }
+
+    })
+
+
+  } else {
+    if (callBack) {
+      var error = getCharacteristicNotFindError()
+      callBack(connectedDevice, error, null)
+    }
+  }
+}
+
+/*
+* 获取mac 地址
+*/
+
+function getMacAddressonFinished(callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+  if (macAddress) {
+    if (callBack) {
+      callBack(connectedDevice, null, macAddress)
+    }
+    return
+  }
+  if (macAddressCharObj) {
+    readBLECharacteristicValue({
+      deviceId: connectedDeviceId,
+      serviceId: preDefService.RealTek_ServiceUUIDs.RealTek_OTAInfo_ServiceUUID,
+      characteristicId: macAddressCharObj.uuid,
+      success: function (res) {
+        macAddressHaveReadBlock = callBack
+
+      },
+      fail: function (res) {
+        if (callBack) {
+          var error = getWechatCustomError(res);
+          callBack(connectedDevice, error, null)
+        }
+
+      }
+
+    })
+  } else {
+    if (callBack) {
+      var error = getCharacteristicNotFindError()
+      callBack(connectedDevice, error, null)
+    }
+  }
+}
+
+
 
 /*
 * Send Data to Device
@@ -3329,6 +3677,13 @@ module.exports = {
   setHRReadContinuous: setHRReadContinuous,
   synRecentSportDataWithStep: synRecentSportDataWithStep,
   synTodayTotalSportDataWithStep: synTodayTotalSportDataWithStep,
-  setBloodPressueEnable: setBloodPressueEnable
+  setBloodPressueEnable: setBloodPressueEnable,
+  modifyDeviceName: modifyDeviceName,
+  getDeviceNameonFinished: getDeviceNameonFinished,
+  getBatteryLevelonFinished: getBatteryLevelonFinished,
+  getOTAPatchVersiononFinished: getOTAPatchVersiononFinished,
+  getOTAApplicationVersiononFinished: getOTAApplicationVersiononFinished,
+  getMacAddressonFinished: getMacAddressonFinished
+
 
 }

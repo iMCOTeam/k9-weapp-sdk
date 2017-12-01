@@ -123,7 +123,7 @@ Page({
     hour = parseInt(hour)
     var min = minute%60
     var info = "hour:" + hour + " minute:" + min
-    console.log(info)
+    
     
 
   },

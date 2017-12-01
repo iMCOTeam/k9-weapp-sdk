@@ -5,7 +5,7 @@ let RealTek_ServiceUUIDs = {
   RealTek_Immediate_Remind_ServiceUUID: '1802', //立即提醒即查找手环ServiceUUID
   RealTek_Link_Loss_ServiceUUID: '1803', //防丢Service UUID
   RealTek_Battery_ServiceUUID: '180F', //电量Service UUID
-  RealTek_OTAInfo_ServiceUUID: '0000d0FF-3C17-D293-8E48-14FE2E4DA212', //获取OTA信息的Service UUID
+  RealTek_OTAInfo_ServiceUUID: '0000D0FF-3C17-D293-8E48-14FE2E4DA212', //获取OTA信息的Service UUID
   RealTek_DFU_ServiceUUID: '00006287-3C17-D293-8E48-14FE2E4DA212' //用于升级固件时的广播和交互Service UUID
 }
 
