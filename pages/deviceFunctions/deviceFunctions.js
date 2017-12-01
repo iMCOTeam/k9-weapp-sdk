@@ -276,6 +276,14 @@ Page({
         that.setContinuousHeartRate(enable)
       }
       break;
+
+      case Function_Keys.ZHBloodPressure:{
+        that.setBloodPressueEnable(enable)
+
+      }
+      break;
+
+
     }
     
 
@@ -392,6 +400,17 @@ Page({
         that.getContinuousHeartRateSetting()
       }
       break;
+
+      case Function_Keys.ZHSycLastSportData:{
+        that.sycLastSportData()
+      }
+      break;
+
+      case Function_Keys.ZHSycTodayAllSportData:{
+        that.sycTodayTotalSportData()
+
+      }
+      break;
     }
 
   },
@@ -409,6 +428,69 @@ Page({
   /* - Functions - */
 
   /*
+  * 血压测量
+  */
+
+  setBloodPressueEnable: function (enable){
+    var connectDevice = manager.getConnectedDevice()
+    if (!connectDevice.hasBloodPressureFunc){
+      wx.showToast({
+        title: '无血压功能!',
+      })
+      return
+    }
+
+    wx.showLoading({
+      title: 'set BloodPressue Enable...',
+    })
+
+    manager.setBloodPressueEnable(enable, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "set BloodPressue Enable Success...",
+        })
+
+      }
+    })
+
+  },
+
+
+  /*
+  * 同步当天总步数
+  */
+  sycTodayTotalSportData: function(){
+    var totalSteps = 1000
+    var totalCalory = 2000
+    var totalDistance = 3000
+
+
+    wx.showLoading({
+      title: 'syc Today Total SportData...',
+    })
+    manager.synTodayTotalSportDataWithStep(totalSteps, totalDistance, totalCalory, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "syc Today Total SportData Success...",
+        })
+
+      }
+    })
+
+  },
+
+
+  /*
   * 同步某个15分钟内的运动数据
   */
 
@@ -424,7 +506,24 @@ Page({
     var numMin = parseInt(minute/15)
     var offset = hour*4 + numMin
 
+    var mode = preModel.ZH_RealTek_Sport_Mode.ZH_RealTek_Walk
+    wx.showLoading({
+      title: 'syc Last SportData...',
+    })
 
+    manager.synRecentSportDataWithStep(steps, activeTime, calory, distance, offset, mode, function (device, error, result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        wx.showToast({
+          title: "syc Last SportData Success...",
+        })
+
+      }
+    })
   },
 
 
@@ -438,6 +537,7 @@ Page({
     })
 
     manager.getHRReadContinuousSettingOnFinished(function (device, error, result){
+      wx.hideLoading()
       if (error) {
         wx.showToast({
           title: error.errMsg,

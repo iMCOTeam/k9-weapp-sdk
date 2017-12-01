@@ -74,6 +74,23 @@ var heartRateDataUpdateBlock = function (device, error, result){
   })
 }
 
+
+var bloodPressureDataUpdateBlock = function (device, error, result) {
+
+  var nums = result.length
+  console.log("bloodPressureDataUpdateBlock:", nums)
+  var info = "Receive bloodPressure data " + nums
+  wx.showToast({
+    title: info,
+  })
+}
+
+var stopMeasuringBloodPressureBlock = function (device, error, result) {
+  wx.showToast({
+    title: "Blood Pressure have stopped!",
+  })
+}
+
 // 大小端模式判定
 var littleEndian = (function () {
   var buffer = new ArrayBuffer(2);
@@ -896,8 +913,31 @@ function parseSportCmdData(l1Payload, blockkey){
 
     }
     break;
+
+    case Sport_Keys.RealTek_Key_BP_Rep:{
+      var info = "Get Blood pressure Res!"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+      var bpItems = getBloodpressureItemsWithValue(l2PayLoad)
+      if (bloodPressureDataUpdateBlock){
+        bloodPressureDataUpdateBlock(connectedDevice,null,bpItems)
+      }
+    }
+    break;
+
+    case Sport_Keys.RealTek_Key_BP_Stop:{
+      var info = "Blood Pressure have stopped!"
+      common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+      if (stopMeasuringBloodPressureBlock){
+        stopMeasuringBloodPressureBlock(connectedDevice,null,null)
+      }
+
+
+    }
+    break;
   }
 }
+
+
 
 
 
@@ -1082,15 +1122,77 @@ function getCalibrationItem(l2PayLoad){
   }
 }
 
+/*
+* 获取血压数据
+*/
+function getBloodpressureItemsWithValue(l2PayLoad){
+  var info = "call getBloodpressureItemsWithValue"
+  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+
+  var bpHeaderSize = 4
+  var bpItemLength = 8
+  var cutyear = preModel.DF_RealTek_Date_Cut_Year
+
+  var l2PayloadHeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Payload_Header_Size
+  var valueLengthPreBuffer = new DataView(l2PayLoad, 1, 1)
+  var valueLengthLateBuffer = new DataView(l2PayLoad, 2, 1)
+  var valueLength = ((valueLengthPreBuffer.getUint8(0) & 0x1) << 8) + valueLengthLateBuffer.getUint8(0)
+
+  if(valueLength < bpHeaderSize){
+    var subinfo = "blood pressure Items Header length less than min length" 
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Warning)
+    return null
+  }
+
+  var l2PayLoadValue = l2PayLoad.slice(l2PayloadHeaderSize)
+
+  var year = ((new DataView(l2PayLoadValue, 0, 1)).getUint8(0) >> 1) & 0x3F
+  var month = (((new DataView(l2PayLoadValue, 0, 1)).getUint8(0) & 0x01) << 3) + ((new DataView(l2PayLoadValue, 1, 1)).getUint8(0) >> 5)
+  var day = (new DataView(l2PayLoadValue, 1, 1)).getUint8(0) & 0x1F
+  var itemCount = (new DataView(l2PayLoadValue, 2, 1)).getUint8(0) * 0x100 + (new DataView(l2PayLoadValue, 3, 1)).getUint8(0)
+  year = year + cutyear
+
+  var bpValue = l2PayLoadValue.slice(bpHeaderSize)
+
+  var bpItems = new Array()
+  for (var index = 0; index < itemCount; index++) {
+    var beginOffset = index * bpItemLength
+    var bpItemValue = bpValue.slice(beginOffset)
+
+    var minutes = ((new DataView(bpItemValue, 2, 1)).getUint8(0) << 8) + (new DataView(bpItemValue, 3, 1)).getUint8(0)
+    var seconds = (new DataView(bpItemValue, 4, 1)).getUint8(0)
+    var hrp = (new DataView(bpItemValue, 5, 1)).getUint8(0)
+    var lowBP = (new DataView(bpItemValue, 6, 1)).getUint8(0)
+    var highBP = (new DataView(bpItemValue, 7, 1)).getUint8(0)
+    var hour = parseInt(minutes/60)
+    var min = minutes%60
+
+    var timeString = year + '-' + month + '-' + day + '-' + hour + '-' + min + '-' + seconds
+
+    var info = "BP Item time:" + timeString + " heartRate:" + hrp + " lowPressure:" + lowBP + " highPressure:" + highBP
+    common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
+
+
+    var bpItem = preModel.initBPItem()
+    bpItem.time = timeString
+    bpItem.heartRate = hrp
+    bpItem.lowPressure = lowBP
+    bpItem.highPressure = highBP
+    bpItems.push(bpItem)
+
+  }
+
+  return bpItems
+
+
+}
 
 /*
 * 获取心率数据
 */
 
 function getHeartRateItemsWithValue(l2PayLoad){
-  var info = "call getHeartRateItemsWithValue"
-  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
-
+  
   var hrHeaderSize = 4
   var hrItemLength = 4
   var cutyear = preModel.DF_RealTek_Date_Cut_Year
@@ -1149,9 +1251,6 @@ function getHeartRateItemsWithValue(l2PayLoad){
 * 获取睡眠数据
 */
 function getSleepItemsWithValue(l2PayLoad){
-  var info = "call getSleepItemsWithValue"
-  common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Verblose)
-  
   var sleepHeaderSize = 4
   var sleepItemLength = 4
   var cutyear = preModel.DF_RealTek_Date_Cut_Year
@@ -1173,7 +1272,7 @@ function getSleepItemsWithValue(l2PayLoad){
   var month = (((new DataView(l2PayLoadValue, 0, 1)).getUint8(0) & 0x01) << 3) + ((new DataView(l2PayLoadValue, 1, 1)).getUint8(0) >> 5)
   var day = (new DataView(l2PayLoadValue, 1, 1)).getUint8(0) & 0x1F
   var itemNumbers = (new DataView(l2PayLoadValue, 3, 1)).getUint8(0)
-  var newYear = year + cutyear
+  year = year + cutyear
 
   var sleepValue = l2PayLoadValue.slice(sleepHeaderSize)
 
@@ -1229,7 +1328,7 @@ function getSleepItemsWithValue(l2PayLoad){
 
       }
       if(!containBool){
-        steps.push(item)
+        sleeps.push(item)
       }
 
       
@@ -2877,16 +2976,16 @@ function synTodayTotalSportDataWithStep(totalSteps, totalDistance, totalCalory, 
   var info = "Calibration total sport data. totalSteps:" + totalSteps + " totalCalory:" + totalCalory + " totalDistance:" + totalDistance 
   common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Info)
   var buffer = new ArrayBuffer(12)
-  var caloryView = new DataView(buffer, 0, 4)
-  var stepView = new DataView(buffer, 4, 4)
-  var distanceView = new DataView(buffer, 8, 11)
+  var stepView = new DataView(buffer, 0, 4)
+  var distanceView = new DataView(buffer, 4, 4)
+  var caloryView = new DataView(buffer, 8, 4)
 
   caloryView.setUint32(0, totalCalory, false)
   stepView.setUint32(0, totalSteps, false)
   distanceView.setUint32(0, totalDistance, false)
 
   var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
-  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_Last_SportStatus_Syn
+  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_Today_SportStatus_Syc
   var seqId = getSeqIDWithCommand(cmd, key)
   var keyValueLength = 12;
   var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
@@ -2921,12 +3020,41 @@ function synRecentSportDataWithStep(steps, activeTime, calory, distance, offset,
   activeTimeView.setUint8(0,activeTime)
   caloryView.setUint32(0,calory,false)
   stepView.setUint16(0,steps,false)
-  distanceView.setUint16(0,steps,false)
+  distanceView.setUint16(0,distance,false)
 
   var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
   var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_Last_SportStatus_Syn
   var seqId = getSeqIDWithCommand(cmd, key)
   var keyValueLength = 10;
+  var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
+  sendDataToBandDevice({
+    data: packet,
+    ackBool: false,
+    callBack: callBack
+  })
+
+
+}
+
+/*
+* 血压测量使能
+*/
+function setBloodPressueEnable(enable,callBack){
+  var connected = hasConnectDevice(callBack)
+  if (!connected) {
+    return
+  }
+
+  var keyValue = enable ? 1 : 0;
+
+  var valueBuffer = new Uint8Array(1)
+  valueBuffer[0] = keyValue
+  var buffer = valueBuffer.buffer
+
+  var cmd = cmdPreDef.ZH_RealTek_CMD_ID.RealTek_CMD_SportData
+  var key = cmdPreDef.ZH_RealTek_Sport_Key.RealTek_Key_BP_Req
+  var seqId = getSeqIDWithCommand(cmd, key)
+  var keyValueLength = 1;
   var packet = getL0PacketWithCommandId(cmd, key, buffer, keyValueLength, false, false, seqId)
   sendDataToBandDevice({
     data: packet,
@@ -3200,6 +3328,7 @@ module.exports = {
   getHRReadContinuousSettingOnFinished: getHRReadContinuousSettingOnFinished,
   setHRReadContinuous: setHRReadContinuous,
   synRecentSportDataWithStep: synRecentSportDataWithStep,
-  synTodayTotalSportDataWithStep: synTodayTotalSportDataWithStep
+  synTodayTotalSportDataWithStep: synTodayTotalSportDataWithStep,
+  setBloodPressueEnable: setBloodPressueEnable
 
 }
