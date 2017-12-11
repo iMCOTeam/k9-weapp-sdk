@@ -2,8 +2,17 @@ let preDefService = require("./ZHBTServiceDef.js")
 let cmdPreDef = require("./ZHBTCmdPreDef.js")
 let common = require("./ZHCommon.js")
 let preModel = require("./ZHBTModel.js")
+let SHAHMAC = require("./ZHSHAHMAC.js")
+
+
+let iMCOServerHost = "https://fota.aimoketechnology.com"
+let iMCOServerInterfaceVersion = 2
 
 //properties
+var AppKey = "keyOPCjEL08cCCIgm33y8cmForWXLSR9uLT"  //需向iMCO申请
+var AppSecret = "secaab78b9d7dbe11e7a420ee796be10e85-i6ff579j49afj5" //需向iMCO申请
+
+
 var discovering = false  //是否处于搜索状态
 var characteristicValueWrtieBlocks = []        //回调函数
 var bluetoolthavailable = false //蓝牙适配器是否可用
@@ -3628,6 +3637,143 @@ function haveResDataWithCmd(cmd,key){
 
 }
 
+
+/* --- 升级模块 ---- */
+
+// 获取后台数据
+function judgeRealTekOTAVersion(appKey, appSecret, fwType, serial, fwVersion, userId,callBack){
+  var serverUrl = iMCOServerHost+'/api/v'+iMCOServerInterfaceVersion+'/checkin'
+  if(!appKey){
+    common.printDebugInfo("AppKey can not is nil", common.ZH_Log_Level.ZH_Log_Info)
+    return;
+  }
+  if(!appSecret){
+    common.printDebugInfo("AppSecret can not is nil", common.ZH_Log_Level.ZH_Log_Info)
+    return;
+  }
+  var temfwVersion = "" + fwVersion 
+  var data = new Object()
+  data.fwType = fwType
+  data.serial = serial
+  data.fwVersion = temfwVersion
+  if(userId){
+    data.userId = userId
+  }
+  var postBody = JSON.stringify(data)
+  console.log("postBody:",postBody)
+  
+  var date = new Date()
+  var timeInterval = Date.parse(date)
+  var radom = Math.floor(Math.random()*1000000 + 1)
+  var nonce = radom
+  var message = appKey + timeInterval + nonce
+  var sign = SHAHMAC.b64_hmac_sha1(appSecret,message)
+  var appOS = "SmallWeChat"
+  var appVersion = "1.0"
+
+  var typeKey = "content-type"
+  var header = new Object()
+  header.Timestamp = timeInterval
+  header.Nonce = nonce
+  header.AppKey = appKey
+  header.Sign = sign
+  header.AppOS = appOS
+  header.AppVersion = appVersion
+ // header.typeKey = "application/x-www-form-urlencoded"
+  
+  
+
+  var info = "fmVersion:"+fwVersion + "--Secret:" + appSecret + "---Message:" + message + "---result:" + sign
+  console.log(info)
+
+
+  wx.request({
+    url: serverUrl,
+    data: postBody,
+    method: 'POST',
+    header: header,
+    dataType: "json",
+    success: function(res){
+      console.log("checkOTA Success Res:",JSON.stringify(res))
+      if(callBack){
+        callBack(connectedDevice,null,res.data)
+      }
+
+    },
+    fail: function(res){
+      console.log("checkOTA fail Res:", JSON.stringify(res))
+      var error = getWechatCustomError(res)
+      if(callBack){
+        callBack(connectedDevice,error,null)
+      }
+
+    }
+
+  })
+
+}
+
+
+// OTA App Check
+
+function checkOTAApplicationHaveNewWithFwType(fwType, serial, userId,callBack){
+  getOTAApplicationVersiononFinished(function(device,error, result){
+    if(error || !result){
+      if(callBack){
+        callBack(connectedDevice,error,null)
+      }
+    }else{
+      var fwVersion = result
+      judgeRealTekOTAVersion(AppKey,AppSecret,fwType,serial,fwVersion,userId,callBack)
+    }
+  })
+}
+
+//OTA Patch Check
+
+function checkOTAPatchHaveNewWithFwType(fwType, serial, userId, callBack){
+  getOTAPatchVersiononFinished(function(device,error,result){
+    if(error || !result){
+      if(callBack){
+        callBack(connectedDevice,error,null)
+      }
+
+    }else{
+      var patchVersion = result
+      judgeRealTekOTAVersion(AppKey,AppSecret,fwType,serial,patchVersion,userId,callBack)
+    }
+  })
+}
+
+
+// 检测固件是否有更新包含 OTA APP 和 Patch 两部分
+
+function checkFirmWareHaveNewVersionWithUserId(userID,callBack){
+  var fwType = 'app'
+  var serial = null
+
+  getMacAddressonFinished(function(device,error,result){
+    if(error || !result){
+      if(callBack){
+        callBack(device,error,null)
+      }
+    }else{
+      serial = result
+      checkOTAApplicationHaveNewWithFwType(fwType,serial,userID,function(device,error,result){
+        if(error || !result){
+          if(callBack){
+            var haveNewVersion = preModel.ZH_RealTek_CheckFirmWareUpdate_Code.ZH_RealTek_CheckFirmWareUpdate_Code
+            callBack(device,error,haveNewVersion)
+          }
+        }else{
+          console.log("checkOTA result:",result)
+
+        }
+      })
+    }
+  })
+}
+
 // 对外可见模块
 module.exports = {
   getConnectedDevice: getConnectedDevice,
@@ -3694,7 +3840,8 @@ module.exports = {
   getBatteryLevelonFinished: getBatteryLevelonFinished,
   getOTAPatchVersiononFinished: getOTAPatchVersiononFinished,
   getOTAApplicationVersiononFinished: getOTAApplicationVersiononFinished,
-  getMacAddressonFinished: getMacAddressonFinished
+  getMacAddressonFinished: getMacAddressonFinished,
+  checkFirmWareHaveNewVersionWithUserId: checkFirmWareHaveNewVersionWithUserId
 
 
 }

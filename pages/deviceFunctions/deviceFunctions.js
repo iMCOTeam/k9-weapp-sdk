@@ -12,7 +12,9 @@ Page({
     bindCommands: [],
     setCommands: [],
     sportCommands: [],
-    assistCommands: []
+    assistCommands: [],
+    otaCommands: [],
+    testCommands: []
   },
 
 
@@ -25,13 +27,17 @@ Page({
     var setCmds = this.getSetCommandKeys()
     var sportCmds = this.getSportCommandKeys()
     var assistCmds = this.getAssistCommandKeys()
+    var otaCmds = this.getOTACommandKeys()
+    var testCmds = this.getTestCommandKeys()
 
     this.setData({
       deviceId: options.deviceId,
       bindCommands: bindCmds,
       setCommands: setCmds,
       sportCommands: sportCmds,
-      assistCommands: assistCmds
+      assistCommands: assistCmds,
+      otaCommands: otaCmds,
+      testCommands: testCmds
 
     })
   },
@@ -182,10 +188,26 @@ Page({
 
   getOTACommandKeys: function(){
 
+    var ZHOnlyTitle = util.ZHFunctionCellMode.ZHOnlyTitle
+    var ZHTitleAndSwitch = util.ZHFunctionCellMode.ZHTitleAndSwitch
+    var functionMode = util.ZHFunctionMode
+    let that = this
+
+    var checkOTAUpdate = that.getFunctionObject("检测固件是否有更新", ZHOnlyTitle, functionMode.ZHCheckOTAVersion)
+    var updateFirmWare = that.getFunctionObject("开始固件升级", ZHOnlyTitle, functionMode.ZHUpdateOTA)
+    
+    return[checkOTAUpdate,updateFirmWare]
+
   },
 
   getTestCommandKeys: function(){
+    var ZHOnlyTitle = util.ZHFunctionCellMode.ZHOnlyTitle
+    var ZHTitleAndSwitch = util.ZHFunctionCellMode.ZHTitleAndSwitch
+    var functionMode = util.ZHFunctionMode
+    let that = this
 
+    var testUserModel = that.getFunctionObject("测试用户", ZHOnlyTitle, functionMode.ZHTestUser)
+    return [testUserModel]
   },
 
   getFunctionObject: function (title,cellMode,functionMode){
@@ -205,6 +227,32 @@ Page({
   /*
   * User Interaction
   */
+
+  clickTestCmd: function (event){
+    var that = this
+    var functionMode = event.target.dataset.functionmode
+    console.log("click functionMode", functionMode)
+    var Function_Keys = util.ZHFunctionMode
+
+    
+
+  },
+
+  clickOTACmd: function (event){
+    var that = this
+    var functionMode = event.target.dataset.functionmode
+    console.log("click functionMode", functionMode)
+    var Function_Keys = util.ZHFunctionMode
+    switch (functionMode) {
+      case Function_Keys.ZHCheckOTAVersion: {
+        that.checkFirmWareUpdate()
+
+      }
+        break;
+    }
+
+  },
+
   clickBindCmd: function (event){
     var that  = this
     var functionMode = event.target.dataset.functionmode
@@ -504,6 +552,39 @@ Page({
   },
 
   /* - Functions - */
+
+  /*
+  * 检测固件是否有更新
+  */
+
+  checkFirmWareUpdate: function(){
+
+    var userId = "TestUser"
+    wx.showLoading({
+      title: 'check FirmWare...',
+    })
+    manager.checkFirmWareHaveNewVersionWithUserId(userId,function(device,error,result){
+      wx.hideLoading()
+      if (error) {
+        wx.showToast({
+          title: error.errMsg,
+        })
+      } else {
+        var code = result
+        var info = "FirmWare is New Version"
+        if (code == preModel.ZH_RealTek_CheckFirmWareUpdate_Code.ZH_Realtek_FirmWare_HaveNewVersion){
+          info = "FirmWare Have New Version"
+        }
+        wx.showToast({
+          title: info,
+        })
+
+      }
+      
+    })
+
+
+  },
 
 
   /*

@@ -53,4 +53,32 @@
     </block>
   </view>
 
+  <view wx:if="{{otaCommands}}">
+    <view class='section_title'>固件升级命令</view>
+    <block wx:for="{{otaCommands}}" wx:key="item.functionMode">
+      <view class='section_items' catchtap='clickOTACmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">
+        <view class='section_item_title'>
+          <view class='title' catchtap='clickOTACmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">{{item.title}}</view>
+        </view>
+        <view class='SwitchView' wx:if="{{item.haveSwitch}}">
+          <switch type="switch" checked="true" bindchange="switchChange" data-functionmode="{{item.functionMode}}"></switch>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view wx:if="{{testCommands}}">
+    <view class='section_title'>测试命令</view>
+    <block wx:for="{{testCommands}}" wx:key="item.functionMode">
+      <view class='section_items' catchtap='clickTestCmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">
+        <view class='section_item_title'>
+          <view class='title' catchtap='clickTestCmd' data-functionmode="{{item.functionMode}}" data-haveswitch="{{item.haveSwitch}}">{{item.title}}</view>
+        </view>
+        <view class='SwitchView' wx:if="{{item.haveSwitch}}">
+          <switch type="switch" checked="true" bindchange="switchChange" data-functionmode="{{item.functionMode}}"></switch>
+        </view>
+      </view>
+    </block>
+  </view>
+
 </view>
