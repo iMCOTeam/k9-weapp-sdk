@@ -41,7 +41,8 @@ let BlueToolthErrorCode = [
 
 let ZH_RealTek_CheckFirmWareUpdate_Code = {
   ZH_Realtek_FirmWare_HaveNewVersion: 0,
-  ZH_RealTek_FirmWare_isNewVersion: 1
+  ZH_RealTek_FirmWare_isNewVersion: 1,
+  ZH_RealTek_CheckInNoNewVersion: 40200
 }
 
 let ZH_RealTek_Login_Status = {

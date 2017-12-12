@@ -253,7 +253,7 @@ Page({
    */
   onShow: function () {
     this.getSystemInfo()
-    this.testRequst(null)
+    //this.testRequst(null)
   },
 
 

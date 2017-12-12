@@ -12,6 +12,11 @@ let iMCOServerInterfaceVersion = 2
 var AppKey = "keyOPCjEL08cCCIgm33y8cmForWXLSR9uLT"  //需向iMCO申请
 var AppSecret = "secaab78b9d7dbe11e7a420ee796be10e85-i6ff579j49afj5" //需向iMCO申请
 
+var updateFirmWareAddress = null //升级地址
+var firmWareType = null // 固件类型
+var firmWareMD5 = null //升级固件的md5校验
+var firmWareSha1Sum = null //升级固件的sha1sum
+var firmWareSha256Sum = null //升级固件的sha256sum
 
 var discovering = false  //是否处于搜索状态
 var characteristicValueWrtieBlocks = []        //回调函数
@@ -213,6 +218,12 @@ function clearCaches()
   OTApatchVersion = 0 
   OTAappVersion = 0 
   macAddress = null 
+
+  updateFirmWareAddress = null 
+  firmWareType = null 
+  firmWareMD5 = null 
+  firmWareSha1Sum = null 
+  firmWareSha256Sum = null 
 }
 
 
@@ -3671,7 +3682,6 @@ function judgeRealTekOTAVersion(appKey, appSecret, fwType, serial, fwVersion, us
   var appOS = "SmallWeChat"
   var appVersion = "1.0"
 
-  var typeKey = "content-type"
   var header = new Object()
   header.Timestamp = timeInterval
   header.Nonce = nonce
@@ -3679,7 +3689,7 @@ function judgeRealTekOTAVersion(appKey, appSecret, fwType, serial, fwVersion, us
   header.Sign = sign
   header.AppOS = appOS
   header.AppVersion = appVersion
- // header.typeKey = "application/x-www-form-urlencoded"
+ 
   
   
 
@@ -3751,27 +3761,94 @@ function checkOTAPatchHaveNewWithFwType(fwType, serial, userId, callBack){
 function checkFirmWareHaveNewVersionWithUserId(userID,callBack){
   var fwType = 'app'
   var serial = null
+  var that = this
+  var isNewVersion = preModel.ZH_RealTek_CheckFirmWareUpdate_Code.ZH_RealTek_FirmWare_isNewVersion
+  var hasNewVersion = preModel.ZH_RealTek_CheckFirmWareUpdate_Code.ZH_Realtek_FirmWare_HaveNewVersion
+  var noNewVersion = preModel.ZH_RealTek_CheckFirmWareUpdate_Code.ZH_RealTek_CheckInNoNewVersion
 
   getMacAddressonFinished(function(device,error,result){
     if(error || !result){
       if(callBack){
-        callBack(device,error,null)
+        callBack(device,error,isNewVersion)
       }
     }else{
       serial = result
       checkOTAApplicationHaveNewWithFwType(fwType,serial,userID,function(device,error,result){
         if(error || !result){
           if(callBack){
-            var haveNewVersion = preModel.ZH_RealTek_CheckFirmWareUpdate_Code.ZH_RealTek_CheckFirmWareUpdate_Code
-            callBack(device,error,haveNewVersion)
+            callBack(device,error,isNewVersion)
           }
         }else{
-          console.log("checkOTA result:",result)
+          if(result){
+            var code = result.code
+            if (code == hasNewVersion){
+              this.getNewFirmWareInfo(result)
+              if(callBack){
+                callBack(device,error,code)
+              }
+              return
+
+            } else if (code == noNewVersion) { //无新版本check patch
+              fwType = 'patch'
+              checkOTAPatchHaveNewWithFwType(fwType,serial,userID,function(device,error,result){
+                if(error || !result){
+                  if (callBack) {
+                    callBack(device, error, isNewVersion)
+                  }
+
+                }else{
+                  if(result){
+                    var code = result.code
+                    if (code == hasNewVersion) {
+                      this.getNewFirmWareInfo(result)
+                      if (callBack) {
+                        callBack(device, error, code)
+                      }
+                      return
+
+                    } else {
+                      if (callBack) {
+                        callBack(device, error, isNewVersion)
+                      }
+                    }
+
+                  }else{
+                    if (callBack) {
+                      callBack(device, error, isNewVersion)
+                    }
+
+                  }
+
+                }
+              })
+            }else{
+              var info = "UpdateFirmWare Server Code:" + code
+              common.printDebugInfo(info, common.ZH_Log_Level.ZH_Log_Error)
+              if(callBack){
+                callBack(connectedDevice,error,isNewVersion)
+              }
+            }
+
+          }else{
+            var haveNewVersion = isNewVersion
+            callBack(device, error, haveNewVersion)
+          }
 
         }
       })
     }
   })
+}
+
+function getNewFirmWareInfo(obj){
+  var payLoad = obj.payload
+  if(payLoad){
+    updateFirmWareAddress = payLoad.resourceUrl
+    firmWareMD5 = payLoad.md5sum
+    firmWareSha1Sum = payLoad.sha1sum
+    firmWareSha256Sum = payLoad.sha256sum
+    firmWareType = payLoad.fwType
+  }
 }
 
 // 对外可见模块
