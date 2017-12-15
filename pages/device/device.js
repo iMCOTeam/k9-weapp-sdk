@@ -3,6 +3,7 @@ const preDef = require('../../utils/ZHBTServiceDef.js')
 const common = require("../../utils/ZHCommon.js")
 const cmdPreDef = require("../../utils/ZHBTCmdPreDef.js")
 const SHAHMAC = require("../../utils/ZHSHAHMAC.js")
+const PreAES = require("../../utils/ZHAES.js")
 
 Page({
   /**
@@ -158,6 +159,39 @@ Page({
     console.log(info)
   },
 
+ /*
+ * test AES
+ */
+
+  testAES: function (){
+ 
+    
+
+    var password = '111111'
+    var key = 'sharejs.com'
+    var result = PreAES.Aes.Ctr.encrypt(password, key, 128)
+    console.log("AES Result:",result)
+
+    
+    var secret_key =[0x4E, 0x46, 0xF8, 0xC5, 0x09, 0x2B, 0x29, 0xE2,
+        0x9A, 0x97, 0x1A, 0x0C, 0xD1, 0xF6, 0x10, 0xFB,
+        0x1F, 0x67, 0x63, 0xDF, 0x80, 0x7A, 0x7E, 0x70,
+        0x96, 0x0D, 0x4C, 0xD3, 0x11, 0x8E, 0x60, 0x1A]
+    var subKey = PreAES.Aes.keyExpansion(secret_key)
+    
+    var buffer = new ArrayBuffer(6)
+    var dataView = new DataView(buffer)
+    dataView.setUint8(0,10)
+
+    var dataArray = new Uint8Array(buffer)
+    var result = PreAES.Aes.cipher(buffer,subKey)
+    console.log("subKey:",subKey)
+
+    console.log("result:",result)
+
+
+
+  },
 
   /*
   * test Requst
@@ -232,6 +266,43 @@ Page({
     var info = "hour:" + hour + " minute:" + min
     
     this.testHMAC()
+
+    var url = "https://fota.aimoketechnology.com/download/firmware/iMCO-k9-app-release-16221-2e97055fceea6757cb9ab9aac8ac3204.bin"
+    const downLoadTask = wx.downloadFile({
+      url: url,
+      success: function (res) {
+        var filePath = res.tempFilePath
+        
+        
+      },
+      fail: function (res) {
+        console.log('fail')
+        console.log(res)
+      },
+      complete: function (res) {
+        console.log('complete')
+        console.log(res)
+      }
+    })
+
+    downLoadTask.onProgressUpdate((res) => {
+      console.log('下载进度', res.progress)
+      console.log('已经下载的数据长度', res.totalBytesWritten)
+      console.log('预期需要下载的数据总长度', res.totalBytesExpectedToWrite)
+    })
+
+   /* wx.request({
+      url: url,
+      success: function (res) {
+        console.log("request success:",res)
+
+
+      },
+      fail: function (res) {
+        console.log('request fail',res)
+      },
+      
+    })*/
    
 
   },
@@ -254,6 +325,7 @@ Page({
   onShow: function () {
     this.getSystemInfo()
     //this.testRequst(null)
+    this.testAES()
   },
 
 

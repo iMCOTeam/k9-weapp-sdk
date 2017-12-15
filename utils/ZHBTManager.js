@@ -3,10 +3,20 @@ let cmdPreDef = require("./ZHBTCmdPreDef.js")
 let common = require("./ZHCommon.js")
 let preModel = require("./ZHBTModel.js")
 let SHAHMAC = require("./ZHSHAHMAC.js")
-
+let PreAES = require("./ZHAES.js")
 
 let iMCOServerHost = "https://fota.aimoketechnology.com"
 let iMCOServerInterfaceVersion = 2
+
+let passKey = [
+    0x4E, 0x46, 0xF8, 0xC5, 0x09, 0x2B, 0x29, 0xE2,
+    0x9A, 0x97, 0x1A, 0x0C, 0xD1, 0xF6, 0x10, 0xFB,
+    0x1F, 0x67, 0x63, 0xDF, 0x80, 0x7A, 0x7E, 0x70,
+    0x96, 0x0D, 0x4C, 0xD3, 0x11, 0x8E, 0x60, 0x1A
+]
+
+let secret_key = PreAES.Aes.keyExpansion(passKey)
+
 
 //properties
 var AppKey = "keyOPCjEL08cCCIgm33y8cmForWXLSR9uLT"  //需向iMCO申请
@@ -17,6 +27,17 @@ var firmWareType = null // 固件类型
 var firmWareMD5 = null //升级固件的md5校验
 var firmWareSha1Sum = null //升级固件的sha1sum
 var firmWareSha256Sum = null //升级固件的sha256sum
+var isUpdatefailed = false
+var OTAMode = preModel.ZH_RealTek_UpdateMode.ZH_RealTek_OTAUpMode_Internal //OTA 模拟，外部或者内部
+
+var waitingUpdateFirmWare = false //是否是在等待升级如果是断开后进行重连
+var SendDataDFUChar = null //固件升级传输固件包的特征
+var ControlCmdDFUChar = null //升级过程中与手环进行升级命令交互的特征
+var imageData = null //固件Data
+var imageSendData = null //将要发送的固件Data这里由于有断点传输所以可能发送的image和原image data 不同
+var haveSendImageSize = 0
+
+
 
 var discovering = false  //是否处于搜索状态
 var characteristicValueWrtieBlocks = []        //回调函数
@@ -130,6 +151,8 @@ var macAddressHaveReadBlock = function (device, error, result) {
 
 }
 
+var updateFirmWareProgress = null //升级回调
+
 // 大小端模式判定
 var littleEndian = (function () {
   var buffer = new ArrayBuffer(2);
@@ -147,7 +170,6 @@ function appendBuffer(buffer1, buffer2) {
 
 // functions
 function initialBTManager(obj){
-  
   //监听蓝牙适配器状态改变
   onBluetoothAdapterStateChange(function (res){
     if (!res.discovering){
@@ -163,6 +185,10 @@ function initialBTManager(obj){
       console.log("bluetooth adapter is not valid")
       bluetoolthavailable = false
       clearCaches()
+      if(updateFirmWareAddress){
+        updateFirmWareAddress(connectedDevice, null, preModel.ZH_RealTek_FirmWare_Update_Status.RealTek_FirmWare_Update_Failed)
+      }
+      clearUpdateFirmWareData()
       
     }else{
       bluetoolthavailable = true
@@ -178,6 +204,14 @@ function initialBTManager(obj){
     if (!res.connected){
       console.log("bluetooth have disconnected with deviceId:", res.deviceId)
       clearCaches()
+      if(!waitingUpdateFirmWare){
+        if(updateFirmWareProgress){
+          updateFirmWareAddress(connectedDevice, null, preModel.ZH_RealTek_FirmWare_Update_Status.RealTek_FirmWare_Update_Failed)
+        }
+      }else{//升级成功重新连接
+
+      }
+      clearUpdateFirmWareData()
     }
   })
 
@@ -224,6 +258,30 @@ function clearCaches()
   firmWareMD5 = null 
   firmWareSha1Sum = null 
   firmWareSha256Sum = null 
+}
+
+
+/* - 清除固件升级缓存 - */
+function clearUpdateFirmWareData()
+{
+  waitingUpdateFirmWare = false
+  haveSendImageSize = 0
+  if(updateFirmWareProgress){
+    updateFirmWareProgress = null
+  }
+  if(SendDataDFUChar){
+    SendDataDFUChar = null
+  }
+  if(ControlCmdDFUChar){
+    ControlCmdDFUChar = null
+  }
+  if(imageData){
+    imageData = null
+  }
+  if(imageSendData){
+    imageSendData = null
+  }
+
 }
 
 
@@ -1024,7 +1082,6 @@ function parseSportCmdData(l1Payload, blockkey){
 
 
 function parseRemindCmdData(l1Payload, blockkey){
-  console.log("call parseRemindCmdData")
   var key = getL2PayloadKeyWithL1PayLoad(l1Payload)
   var l2HeaderSize = cmdPreDef.DF_RealTek_L2_Header.DF_RealTek_L2_Header_Size
   var l2PayLoad = l1Payload.slice(2)
@@ -1638,7 +1695,6 @@ function getAllFunctionsWithValue(value){
 * 获取所有服务
 */
 function getAllServices(){
-  console.log("call getAllServices")
   getBLEDeviceServices({
     deviceId: connectedDeviceId,
     success: function (serRes) {
@@ -1661,6 +1717,9 @@ function getAllServices(){
 function handleService(service){
   var serviceUUID = service.uuid
   var preDefSer = preDefService.RealTek_ServiceUUIDs
+  if (serviceUUID.indexOf(preDefSer.RealTek_DFU_ServiceUUID) != -1 ){
+    OTAMode = preModel.ZH_RealTek_UpdateMode.ZH_RealTek_OTAUpMode_External
+  }
   if (serviceUUID.indexOf(preDefSer.RealTek_Immediate_Remind_ServiceUUID) != -1 ){
     immediateRemindServiceObj = service
   }
@@ -1707,8 +1766,19 @@ function handleCharacteristic(serviceUUID,characteristic){
   var charProperties = characteristic.properties
   var preDefChar = preDefService.CharacteristicUUIDs
   var deviceId = connectedDeviceId
+  if (charUUIDString.indexOf(preDefChar.RealTek_DFUTransferData_CharUUID) != -1){
+    console.log("find DFUTransferData_CharUUID -", characteristic.uuid)
+    SendDataDFUChar = characteristic
+  }
+  if (charUUIDString.indexOf(preDefChar.RealTek_DFUControlCmd_CharUUID) != -1) {
+    console.log("find ControlCmdDFUChar_CharUUID -", characteristic.uuid)
+    ControlCmdDFUChar = characteristic
+    handleNotifyCharacteristic(serviceUUID,characteristic)
+  }
+  
+
   if (charUUIDString.indexOf(preDefChar.RealTek_Write_CharUUID) != -1){
-    console.log("find RealTek_Write_CharUUID -", characteristic.uuid)
+    
     writeCharObj = characteristic
   } 
   if (charUUIDString.indexOf(preDefChar.RealTek_Notify_CharUUID) != -1){
@@ -2087,6 +2157,13 @@ function getWechatNotUseError(){
   var error = preModel.initError(code, errMsg)
   return error
 
+}
+
+function getBatteryLevelError(){
+  var code = preModel.ZH_RealTek_Error_Code.ZHBatteryErrorCode
+  var errMsg = "Battery power below 40 cannot be upgraded,please charge it first."
+  var error = preModel.initError(code, errMsg)
+  return error
 }
 
 
@@ -3648,6 +3725,13 @@ function haveResDataWithCmd(cmd,key){
 
 }
 
+/* -- AES Method -- */
+function aesInit(mode){
+  var key = secret_key
+
+
+
+}
 
 /* --- 升级模块 ---- */
 
@@ -3850,6 +3934,103 @@ function getNewFirmWareInfo(obj){
     firmWareType = payLoad.fwType
   }
 }
+
+/* --- Begin Update Firmware --- */
+
+function updateFirmWareFaild (){
+  isUpdatefailed = true
+}
+
+function resetUpdateFirmWareStatus (){
+  isUpdatefailed = false
+}
+
+//Step 1 Check power level,must more than 40
+
+function updateFirmwareonFinished(progress){
+  updateFirmWareProgress = progress
+  resetUpdateFirmWareStatus()
+  var updateFail = preModel.ZH_RealTek_FirmWare_Update_Status.RealTek_FirmWare_Loading_OTA
+  var OTAMODES = preModel.ZH_RealTek_UpdateMode
+  if(progress){
+    progress(connectedDevice, null, updateFail,0)
+  }
+  getBatteryLevelonFinished(function(device,error,result){
+    if(error){
+      if (progress) {
+        progress(connectedDevice, null, updateFail, 0)
+      }
+    }else{
+      if(result){
+        if (result >= 40) {// 可以升级
+          if (OTAMode == OTAMODES.ZH_RealTek_OTAUpMode_Internal){//内部flash需要先进入OTA模式然后重连             
+
+          } else {//外部flash模式直接升级
+
+          }
+        }else{
+          var subError = getBatteryLevelError()
+          if (progress) {
+            progress(connectedDevice, subError, updateFail, 0)
+          }
+
+        }
+
+      }else{
+        if (progress) {
+          progress(connectedDevice, null, updateFail, 0)
+        }
+      }
+    }
+  })
+
+}
+
+//- Step 6 Check DFU Service
+
+function checkDFUService(){
+  if(!SendDataDFUChar || !ControlCmdDFUChar){
+    if(updateFirmWareProgress){
+      var error = getCharacteristicNotFindError()
+      updateFirmWareProgress(connectedDevice, error, preModel.ZH_RealTek_FirmWare_Update_Status.RealTek_FirmWare_Update_Failed,0)
+    }
+  }else{
+
+
+  }
+}
+
+
+//Step 7 Send Data
+
+function startLoadFirmWareData(url){
+  const downLoadTask = wx.downloadFile({
+    url:url,
+    success:function(res){
+      var filePath = res.tempFilePath
+     
+
+    },
+    fail:function(res){
+
+    }
+  })
+
+  downloadTask.onProgressUpdate((res) => {
+    console.log('下载进度', res.progress)
+    console.log('已经下载的数据长度', res.totalBytesWritten)
+    console.log('预期需要下载的数据总长度', res.totalBytesExpectedToWrite)
+  })
+
+
+
+}
+
+function loadRealTekOTADataWithUrl(url,callBack){
+
+}
+
+
 
 // 对外可见模块
 module.exports = {

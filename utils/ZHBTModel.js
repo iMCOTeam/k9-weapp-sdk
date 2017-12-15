@@ -7,6 +7,21 @@ let CALLBACK = function(device, error, result){
 
 }
 
+let ZH_RealTek_UpdateMode = {
+  ZH_RealTek_OTAUpMode_None: -1,
+  ZH_RealTek_OTAUpMode_Internal: 0,
+  ZH_RealTek_OTAUpMode_External: 1
+}
+
+let ZH_RealTek_FirmWare_Update_Status = {
+  RealTek_FirmWare_Loading_OTA: 0, //Download the firmware.
+  RealTek_FirmWare_Updateing: 1, //Update the firmware.
+  RealTek_FirmWare_Update_Failed: 2, //Update firmware failed.
+  RealTek_FirmWare_Update_Finished: 3, //Update firmware finished.
+  RealTek_FirmWare_Update_Success: 4, //Update firmware success.
+  RealTek_FirmWare_Update_Restart: 5 //Updated the SmartBand to restart.
+}
+
 /* - 自定义错误码 - */
 let ZH_RealTek_Error_Code = {
   ZHCharactiristicNotFindCode: 100001,
@@ -263,6 +278,7 @@ function initSportCalibrationItem(){
 
 
 module.exports = {
+  ZH_RealTek_UpdateMode: ZH_RealTek_UpdateMode,
   DF_RealTek_Date_Cut_Year: DF_RealTek_Date_Cut_Year,
   ZH_RealTek_Error_Code: ZH_RealTek_Error_Code,
   BlueToolthErrorCode: BlueToolthErrorCode,
