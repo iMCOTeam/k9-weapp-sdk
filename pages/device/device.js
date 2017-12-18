@@ -141,139 +141,22 @@ Page({
 
 
   /*
-  * test SHAHMAC
+  * test load firmware data
   */
-
-  testHMAC: function(){
-    var appKey = "keyOPCjEL08cCCIgm33y8cmForWXLSR9uLT"
-    var appSecret = "secaab78b9d7dbe11e7a420ee796be10e85-i6ff579j49afj5"
-    var date = new Date()
-    var timeInterval = Date.parse(date)
-    var radom = Math.floor(Math.random() * 1000000 + 1)
-    var nonce = radom
-    var message = appKey + timeInterval + nonce
-    var sign = SHAHMAC.b64_hmac_sha1(appSecret, message)
-
-  
-    var info = "Secret:" + appSecret + "---Message:" + message + "---result:" + sign
-    console.log(info)
-  },
-
- /*
- * test AES
- */
-
-  testAES: function (){
- 
-    
-
-    var password = '111111'
-    var key = 'sharejs.com'
-    var result = PreAES.Aes.Ctr.encrypt(password, key, 128)
-    console.log("AES Result:",result)
-
-    
-    var secret_key =[0x4E, 0x46, 0xF8, 0xC5, 0x09, 0x2B, 0x29, 0xE2,
-        0x9A, 0x97, 0x1A, 0x0C, 0xD1, 0xF6, 0x10, 0xFB,
-        0x1F, 0x67, 0x63, 0xDF, 0x80, 0x7A, 0x7E, 0x70,
-        0x96, 0x0D, 0x4C, 0xD3, 0x11, 0x8E, 0x60, 0x1A]
-    var subKey = PreAES.Aes.keyExpansion(secret_key)
-    
-    var buffer = new ArrayBuffer(6)
-    var dataView = new DataView(buffer)
-    dataView.setUint8(0,10)
-
-    var dataArray = new Uint8Array(buffer)
-    var result = PreAES.Aes.cipher(buffer,subKey)
-    console.log("subKey:",subKey)
-
-    console.log("result:",result)
-
-
-
-  },
-
-  /*
-  * test Requst
-  */
-
-  testRequst: function (callBack){
-    var serverUrl = "https://xcx.cowatch.cn/api/test/wx_test"
-    var ttt = 1234567
-    var testVersion = "" + ttt
-
-    var data = new Object()
-    data.vendor = "iMCO"
-    data.model = "K9"
-    data.fwType = "4567"
-    data.serial = "XD123efDg"
-    data.fwVersion = testVersion
-    
-    var appKey = "keyOPCjEL08cCCIgm33y8cmForWXLSR9uLT"
-    var appSecret = "secaab78b9d7dbe11e7a420ee796be10e85-i6ff579j49afj5"
-
-    var date = new Date()
-    var timeInterval = Date.parse(date)
-    var radom = Math.floor(Math.random() * 1000000 + 1)
-    var nonce = radom
-    var message = appKey + timeInterval + nonce
-    var sign = SHAHMAC.b64_hmac_sha1(appSecret, message)
-    var appOS = "SmallWeChat"
-    var appVersion = "1.0"
-
-    var header = new Object()
-    header.Timestamp = timeInterval
-    header.Nonce = nonce
-    header.AppKey = appKey
-    header.Sign = sign
-    header.AppOS = appOS
-    header.AppVersion = appVersion
-
-    wx.request({
-      url: serverUrl,
-      data: data,
-      method: 'POST',
-      header: header,
-      success: function (res) {
-        console.log("checkOTA Success Res:", JSON.stringify(res))
-        if (callBack) {
-          callBack(connectedDevice, null, res.data)
-        }
-
-      },
-      fail: function (res) {
-        console.log("checkOTA fail Res:", JSON.stringify(res))
-        var error = null
-        if (callBack) {
-          callBack(connectedDevice, error, null)
-        }
-
-      }
-
-    })
-
-  },
-
-  /**
-   * 生命周期函数--监听页面加载
-   */
-  onLoad: function (options) {
-
+  testloadFirmwareData: function(){
     var minute = 140
-    var hour = minute/60
+    var hour = minute / 60
     hour = parseInt(hour)
-    var min = minute%60
+    var min = minute % 60
     var info = "hour:" + hour + " minute:" + min
-    
-    this.testHMAC()
 
     var url = "https://fota.aimoketechnology.com/download/firmware/iMCO-k9-app-release-16221-2e97055fceea6757cb9ab9aac8ac3204.bin"
     const downLoadTask = wx.downloadFile({
       url: url,
       success: function (res) {
         var filePath = res.tempFilePath
-        
-        
+
+
       },
       fail: function (res) {
         console.log('fail')
@@ -303,7 +186,64 @@ Page({
       },
       
     })*/
-   
+
+  },
+
+  /*
+  * test SHAHMAC
+  */
+
+  testHMAC: function(){
+    var appKey = "keyOPCjEL08cCCIgm33y8cmForWXLSR9uLT"
+    var appSecret = "secaab78b9d7dbe11e7a420ee796be10e85-i6ff579j49afj5"
+    var date = new Date()
+    var timeInterval = Date.parse(date)
+    var radom = Math.floor(Math.random() * 1000000 + 1)
+    var nonce = radom
+    var message = appKey + timeInterval + nonce
+    var sign = SHAHMAC.b64_hmac_sha1(appSecret, message)
+
+  
+    var info = "Secret:" + appSecret + "---Message:" + message + "---result:" + sign
+    console.log(info)
+  },
+
+ /*
+ * test AES
+ */
+
+  testAES: function (){
+    var password = '111111'
+    var key = 'sharejs.com'
+    var result = PreAES.Aes.Ctr.encrypt(password, key, 128)
+    console.log("AES Result:",result)
+
+    
+    var secret_key =[0x4E, 0x46, 0xF8, 0xC5, 0x09, 0x2B, 0x29, 0xE2,
+        0x9A, 0x97, 0x1A, 0x0C, 0xD1, 0xF6, 0x10, 0xFB,
+        0x1F, 0x67, 0x63, 0xDF, 0x80, 0x7A, 0x7E, 0x70,
+        0x96, 0x0D, 0x4C, 0xD3, 0x11, 0x8E, 0x60, 0x1A]
+    var subKey = PreAES.Aes.keyExpansion(secret_key)
+    
+    var buffer = new ArrayBuffer(6)
+    var dataView = new DataView(buffer)
+    dataView.setUint8(0,10)
+
+    var dataArray = new Uint8Array(buffer)
+    var result = PreAES.Aes.cipher(buffer,subKey)
+    console.log("subKey:",subKey)
+
+    console.log("result:",result)
+
+
+
+  },
+
+  
+  /**
+   * 生命周期函数--监听页面加载
+   */
+  onLoad: function (options) {
 
   },
 
@@ -324,8 +264,7 @@ Page({
    */
   onShow: function () {
     this.getSystemInfo()
-    //this.testRequst(null)
-    this.testAES()
+    //this.testAES()
   },
 
 

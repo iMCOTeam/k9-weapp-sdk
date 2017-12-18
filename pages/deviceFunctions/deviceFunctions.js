@@ -28,7 +28,7 @@ Page({
     var sportCmds = this.getSportCommandKeys()
     var assistCmds = this.getAssistCommandKeys()
     var otaCmds = this.getOTACommandKeys()
-    var testCmds = this.getTestCommandKeys()
+    //var testCmds = this.getTestCommandKeys()
 
     this.setData({
       deviceId: options.deviceId,
@@ -36,8 +36,8 @@ Page({
       setCommands: setCmds,
       sportCommands: sportCmds,
       assistCommands: assistCmds,
-      otaCommands: otaCmds,
-      testCommands: testCmds
+      otaCommands: otaCmds
+      //testCommands: testCmds
 
     })
   },
@@ -196,7 +196,7 @@ Page({
     var checkOTAUpdate = that.getFunctionObject("检测固件是否有更新", ZHOnlyTitle, functionMode.ZHCheckOTAVersion)
     var updateFirmWare = that.getFunctionObject("开始固件升级", ZHOnlyTitle, functionMode.ZHUpdateOTA)
     
-    return[checkOTAUpdate,updateFirmWare]
+    return[checkOTAUpdate]
 
   },
 
